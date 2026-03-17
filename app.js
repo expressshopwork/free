@@ -83,7 +83,6 @@ function _gsPost(payload, retries) {
   retries = retries === undefined ? 2 : retries;
   return fetch(GS_URL, {
     method: 'POST',
-    mode: 'no-cors',
     body: JSON.stringify(payload)
   }).catch(function(err) {
     if (retries > 0) {
