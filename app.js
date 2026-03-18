@@ -3447,6 +3447,11 @@ function renderPromoSettingTable() {
 // ------------------------------------------------------------
 var USD_DENOMS = [100, 50, 20, 10, 5, 1];
 var KHR_DENOMS = [100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 100];
+var KHR_EXCHANGE_RATE = 4000; // 1 USD = 4000 KHR
+
+function khrToUsd(riel) {
+  return (riel || 0) / KHR_EXCHANGE_RATE;
+}
 
 function formatKHR(n) {
   return (n || 0).toLocaleString('en-US') + ' ៛';
@@ -3637,7 +3642,7 @@ function submitDeposit(e) {
     creditAmount: credit,
     riel: riel,
     cashDetail: (cashDetailUsd.length || cashDetailKhr.length) ? { usd: cashDetailUsd, khr: cashDetailKhr } : null,
-    amount: cash + credit,
+    amount: cash + credit + khrToUsd(riel),
     date: rv('dep-date'),
     submittedAt: (existingRecord && existingRecord.submittedAt) || new Date().toISOString(),
     remark: rv('dep-remark'),
@@ -3704,10 +3709,15 @@ function approveDeposit(id) {
 
 function updateDepositKpis() {
   const baseDeposits = getBaseRecordsForRole(depositList);
-  let totalCash = 0, totalCredit = 0;
+  let totalCash = 0, totalCredit = 0, totalRiel = 0;
   const agents = new Set();
-  baseDeposits.forEach(function(d) { totalCash += (d.cash || 0); totalCredit += _depCreditAmt(d); agents.add(d.agent); });
-  const total = totalCash + totalCredit;
+  baseDeposits.forEach(function(d) {
+    totalCash += (d.cash || 0);
+    totalCredit += _depCreditAmt(d);
+    totalRiel += (d.riel || 0);
+    agents.add(d.agent);
+  });
+  const total = totalCash + totalCredit + khrToUsd(totalRiel);
   const el1 = g('dep-kpi-total'); if (el1) el1.textContent = fmtMoney(total);
   const el2 = g('dep-kpi-count'); if (el2) el2.textContent = baseDeposits.length;
   const el3 = g('dep-kpi-agents'); if (el3) el3.textContent = agents.size;
@@ -3787,11 +3797,11 @@ function renderDepositTable() {
 
   // Update header to include cash, credit, status columns
   if (thead) {
-    thead.innerHTML = '<tr><th>#</th><th>Agent</th><th>Branch</th><th>Cash ($)</th><th>Credit ($)</th><th>Total</th><th>Date</th><th>Remark</th><th>Status</th><th>Actions</th></tr>';
+    thead.innerHTML = '<tr><th>#</th><th>Agent</th><th>Branch</th><th>Cash ($)</th><th>Cash KHR (៛)</th><th>Credit ($)</th><th>Total</th><th>Date</th><th>Remark</th><th>Status</th><th>Actions</th></tr>';
   }
 
   if (!baseDepositList.length) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:#999;"><i class="fas fa-piggy-bank" style="font-size:2rem;display:block;margin-bottom:8px;"></i>No deposit records yet</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:40px;color:#999;"><i class="fas fa-piggy-bank" style="font-size:2rem;display:block;margin-bottom:8px;"></i>No deposit records yet</td></tr>';
     return;
   }
   const canApprove = (currentRole === 'supervisor' || currentRole === 'admin' || currentRole === 'cluster');
@@ -3808,8 +3818,9 @@ function renderDepositTable() {
       '<td><div class="name-cell"><span class="avatar-circle av-' + avIdx + '" style="width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;color:#fff;margin-right:8px;">' + esc(ini(d.agent)) + '</span>' + esc(d.agent) + '</div></td>' +
       '<td>' + esc(d.branch || '') + '</td>' +
       '<td style="color:#1B7D3D;font-weight:600;">' + (d.cash ? '$' + Number(d.cash).toFixed(2) : '—') + '</td>' +
+      '<td style="color:#8B6914;font-weight:600;">' + (d.riel ? formatKHR(d.riel) : '—') + '</td>' +
       '<td style="color:#1565C0;font-weight:600;">' + (dCreditAmt ? '$' + Number(dCreditAmt).toFixed(2) : '—') + '</td>' +
-      '<td style="font-weight:700;color:#1B7D3D;">$' + Number((d.cash || 0) + (dCreditAmt || 0)).toFixed(2) + '</td>' +
+      '<td style="font-weight:700;color:#1B7D3D;">$' + Number((d.cash || 0) + khrToUsd(d.riel) + (dCreditAmt || 0)).toFixed(2) + '</td>' +
       '<td>' + esc(d.date || '') + '</td>' +
       '<td style="color:#888;font-size:0.8rem;">' + esc(d.remark || d.note || '') + '</td>' +
       '<td><span class="pill ' + statusPill + '">' + statusLabel + '</span></td>' +
@@ -3853,12 +3864,13 @@ function renderDepositSummaryView() {
 
   var agentMap = {};
   baseDepositList.forEach(function(d) {
-    if (!agentMap[d.agent]) agentMap[d.agent] = { cash: 0, credit: 0, total: 0, count: 0, branch: d.branch || '' };
+    if (!agentMap[d.agent]) agentMap[d.agent] = { cash: 0, riel: 0, credit: 0, total: 0, count: 0, branch: d.branch || '' };
     var ag = agentMap[d.agent];
     var dCreditAmt = _depCreditAmt(d);
     ag.cash += (d.cash || 0);
+    ag.riel += (d.riel || 0);
     ag.credit += dCreditAmt;
-    ag.total += (d.cash || 0) + dCreditAmt;
+    ag.total += (d.cash || 0) + khrToUsd(d.riel) + dCreditAmt;
     ag.count++;
   });
 
@@ -3872,6 +3884,7 @@ function renderDepositSummaryView() {
       '</div>' +
       '<div class="summary-card-body">' +
         '<div class="summary-row"><span>Cash</span><span style="color:#1B7D3D;font-weight:600;">$' + Number(ag.cash).toFixed(2) + '</span></div>' +
+        '<div class="summary-row"><span>Cash KHR</span><span style="color:#8B6914;font-weight:600;">' + formatKHR(ag.riel) + '</span></div>' +
         '<div class="summary-row"><span>Credit</span><span style="color:#1565C0;font-weight:600;">$' + Number(ag.credit).toFixed(2) + '</span></div>' +
         '<div class="summary-row"><span>Total</span><span style="font-weight:700;color:#1A1A2E;">$' + Number(ag.total).toFixed(2) + '</span></div>' +
       '</div>' +
