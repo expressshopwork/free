@@ -2808,6 +2808,30 @@ input, select, textarea, button {
   font-weight: 700;
 }
 
+/* ── Expiry Notice — expired item badge (red tint) ───────── */
+.expiry-notice-item-expired {
+  background: #fff1f0;
+  border-color: #ef4444;
+  color: #991b1b;
+}
+
+/* ── Expiry Notice — View button ─────────────────────────── */
+.expiry-view-btn {
+  flex-shrink: 0;
+  align-self: center;
+  background: #f59e0b;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 16px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s;
+}
+.expiry-view-btn:hover { background: #d97706; }
+
 /* ── Inventory Badges ─────────────────────────────────────── */
 .inv-badge-status {
   display: inline-flex;

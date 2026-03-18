@@ -670,6 +670,33 @@ function last7Months() {
   }
   return r;
 }
+// Parse a date string safely as a local-timezone Date to avoid UTC off-by-one.
+// Handles "YYYY-MM-DD", ISO timestamps ("2026-03-19T17:00:00.000Z"), and "DD-MM-YYYY".
+function parseLocalDate(str) {
+  if (!str) return null;
+  // YYYY-MM-DD — parse directly as local date (avoids UTC midnight shift)
+  var iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
+  if (iso) return new Date(+iso[1], +iso[2] - 1, +iso[3]);
+  // ISO timestamp — convert UTC instant to local date components
+  if (str.length > 10) {
+    var d = new Date(str);
+    if (!isNaN(d.getTime())) return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+  // DD-MM-YYYY (Google Sheets locale variant)
+  var dmy = /^(\d{1,2})-(\d{1,2})-(\d{4})$/.exec(str);
+  if (dmy) return new Date(+dmy[3], +dmy[2] - 1, +dmy[1]);
+  return null;
+}
+
+// Normalise any date value (string or timestamp) to a "YYYY-MM-DD" local date string.
+function toLocalDateStr(str) {
+  if (!str) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str; // already normalised
+  var d = parseLocalDate(str);
+  if (!d) return str;
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
 function pctChange(curr, prev) {
   if (!prev) return null;
   return Math.round((curr - prev) / prev * 100);
@@ -2875,30 +2902,55 @@ function renderTopUpTable() {
   const tbody = g('topup-table');
   if (!tbody) return;
 
-  // Render nearly-expired notice
+  // Build today / +7-day boundaries using local dates
   const MS_PER_DAY = 86400000;
-  const today = new Date(new Date().toISOString().split('T')[0]);
+  var _now = new Date();
+  const today = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate());
   const in7Days = new Date(today); in7Days.setDate(in7Days.getDate() + 7);
+
   const baseTopUpList = getBaseRecordsForRole(topUpList);
+
+  // Collect expired (past due) and nearly-expired (≤ 7 days) customers
+  const expired = baseTopUpList.filter(function(c) {
+    if (!c.endDate || c.tuStatus === 'terminate') return false;
+    const exp = parseLocalDate(c.endDate);
+    return exp && exp < today;
+  });
   const nearlyExpired = baseTopUpList.filter(function(c) {
     if (!c.endDate || c.tuStatus === 'terminate') return false;
-    const exp = new Date(c.endDate);
-    return exp >= today && exp <= in7Days;
+    const exp = parseLocalDate(c.endDate);
+    return exp && exp >= today && exp <= in7Days;
   });
+
   const noticeEl = g('topup-expiry-notice');
   if (noticeEl) {
-    if (nearlyExpired.length) {
+    const totalAlert = expired.length + nearlyExpired.length;
+    if (totalAlert) {
+      var titleParts = [];
+      if (expired.length) titleParts.push(expired.length + ' expired');
+      if (nearlyExpired.length) titleParts.push(nearlyExpired.length + ' expiring within 7 days');
+      var iconCls = expired.length ? 'fa-triangle-exclamation' : 'fa-bell';
       noticeEl.innerHTML = '<div class="expiry-notice-banner">' +
-        '<div class="expiry-notice-icon"><i class="fas fa-bell"></i></div>' +
+        '<div class="expiry-notice-icon"><i class="fas ' + iconCls + '"></i></div>' +
         '<div class="expiry-notice-content">' +
-          '<div class="expiry-notice-title">Follow-up Required — ' + nearlyExpired.length + ' customer' + (nearlyExpired.length > 1 ? 's' : '') + ' expiring within 7 days</div>' +
+          '<div class="expiry-notice-title">Follow-up Required — ' + titleParts.join(' & ') + '</div>' +
           '<div class="expiry-notice-list">' +
             nearlyExpired.map(function(c) {
-              const daysLeft = Math.round((new Date(c.endDate) - today) / MS_PER_DAY);
-              return '<span class="expiry-notice-item">' + esc(c.name) + ' (' + esc(c.phone) + ') — <strong>' + (daysLeft === 0 ? 'Today' : daysLeft + ' day' + (daysLeft > 1 ? 's' : '')) + '</strong></span>';
+              const exp = parseLocalDate(c.endDate);
+              const daysLeft = Math.round((exp - today) / MS_PER_DAY);
+              return '<span class="expiry-notice-item"><i class="fas fa-clock" style="color:#f59e0b;margin-right:3px;"></i>' +
+                esc(c.name) + ' (' + esc(c.phone) + ') — <strong>' +
+                (daysLeft === 0 ? 'Today' : daysLeft + ' day' + (daysLeft > 1 ? 's' : '')) + '</strong></span>';
+            }).join('') +
+            expired.map(function(c) {
+              const exp = parseLocalDate(c.endDate);
+              const daysAgo = Math.abs(Math.round((exp - today) / MS_PER_DAY));
+              return '<span class="expiry-notice-item expiry-notice-item-expired"><i class="fas fa-circle-xmark" style="color:#ef4444;margin-right:3px;"></i>' +
+                esc(c.name) + ' (' + esc(c.phone) + ') — <strong>' + daysAgo + 'd ago</strong></span>';
             }).join('') +
           '</div>' +
         '</div>' +
+        '<button class="btn expiry-view-btn" onclick="openExpiryNoticeModal()"><i class="fas fa-eye"></i> View</button>' +
       '</div>';
     } else {
       noticeEl.innerHTML = '';
@@ -2928,17 +2980,18 @@ function renderTopUpTable() {
     const canEdit = canModifyRecord(c);
     var expiryCell = '<td>—</td>';
     var rowClass = '';
+    var displayDate = toLocalDateStr(c.endDate);
     if (c.endDate) {
-      const exp = new Date(c.endDate);
-      const daysLeft = Math.round((exp - today) / MS_PER_DAY);
-      if (tuSt !== 'terminate' && daysLeft >= 0 && daysLeft <= 7) {
+      const exp = parseLocalDate(c.endDate);
+      const daysLeft = exp ? Math.round((exp - today) / MS_PER_DAY) : null;
+      if (exp && tuSt !== 'terminate' && daysLeft >= 0 && daysLeft <= 7) {
         rowClass = ' class="tr-nearly-expired"';
-        expiryCell = '<td><span class="expiry-badge expiry-badge-warn">' + esc(c.endDate) + ' <span class="expiry-days-left">(' + (daysLeft === 0 ? 'Today' : daysLeft + 'd') + ')</span></span></td>';
-      } else if (tuSt !== 'terminate' && daysLeft < 0) {
+        expiryCell = '<td><span class="expiry-badge expiry-badge-warn">' + esc(displayDate) + ' <span class="expiry-days-left">(' + (daysLeft === 0 ? 'Today' : daysLeft + 'd') + ')</span></span></td>';
+      } else if (exp && tuSt !== 'terminate' && daysLeft < 0) {
         rowClass = ' class="tr-expired"';
-        expiryCell = '<td><span class="expiry-badge expiry-badge-expired">' + esc(c.endDate) + ' <span class="expiry-days-left">(Expired)</span></span></td>';
+        expiryCell = '<td><span class="expiry-badge expiry-badge-expired">' + esc(displayDate) + ' <span class="expiry-days-left">(Expired)</span></span></td>';
       } else {
-        expiryCell = '<td>' + esc(c.endDate) + '</td>';
+        expiryCell = '<td>' + esc(displayDate) + '</td>';
       }
     }
     return '<tr' + rowClass + '>' +
@@ -2957,6 +3010,79 @@ function renderTopUpTable() {
       '</td>' +
       '</tr>';
   }).join('');
+}
+
+function openExpiryNoticeModal() {
+  const MS_PER_DAY = 86400000;
+  var _now = new Date();
+  const today = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate());
+  const in7Days = new Date(today); in7Days.setDate(in7Days.getDate() + 7);
+  const baseTopUpList = getBaseRecordsForRole(topUpList);
+
+  const expiredList = baseTopUpList.filter(function(c) {
+    if (!c.endDate || c.tuStatus === 'terminate') return false;
+    const exp = parseLocalDate(c.endDate);
+    return exp && exp < today;
+  });
+  const nearlyExpiredList = baseTopUpList.filter(function(c) {
+    if (!c.endDate || c.tuStatus === 'terminate') return false;
+    const exp = parseLocalDate(c.endDate);
+    return exp && exp >= today && exp <= in7Days;
+  });
+
+  // Sort: expired first (most overdue first), then expiring (soonest first)
+  expiredList.sort(function(a, b) { return parseLocalDate(a.endDate) - parseLocalDate(b.endDate); });
+  nearlyExpiredList.sort(function(a, b) { return parseLocalDate(a.endDate) - parseLocalDate(b.endDate); });
+
+  var rows = [];
+  expiredList.forEach(function(c) {
+    var exp = parseLocalDate(c.endDate);
+    rows.push({ c: c, exp: exp, type: 'expired', daysLeft: Math.round((exp - today) / MS_PER_DAY) });
+  });
+  nearlyExpiredList.forEach(function(c) {
+    var exp = parseLocalDate(c.endDate);
+    rows.push({ c: c, exp: exp, type: 'expiring', daysLeft: Math.round((exp - today) / MS_PER_DAY) });
+  });
+
+  var tbodyHtml = rows.map(function(row, i) {
+    var c = row.c;
+    var displayDate = toLocalDateStr(c.endDate);
+    var statusBadge = row.type === 'expired'
+      ? '<span class="expiry-badge expiry-badge-expired"><i class="fas fa-circle-xmark"></i> Expired</span>'
+      : '<span class="expiry-badge expiry-badge-warn"><i class="fas fa-clock"></i> Expiring Soon</span>';
+    var daysText = row.daysLeft < 0
+      ? Math.abs(row.daysLeft) + 'd ago'
+      : (row.daysLeft === 0 ? 'Today' : row.daysLeft + 'd left');
+    return '<tr>' +
+      '<td>' + (i + 1) + '</td>' +
+      '<td>' + esc(c.name) + '</td>' +
+      '<td>' + esc(c.phone) + '</td>' +
+      '<td>' + statusBadge + '</td>' +
+      '<td><strong>' + daysText + '</strong></td>' +
+      '<td>' + esc(c.agent || '') + '</td>' +
+      '<td>' + esc(c.branch || '') + '</td>' +
+      '<td>' + esc(displayDate) + '</td>' +
+      '</tr>';
+  }).join('');
+
+  var body = g('expiry-notice-modal-body');
+  if (body) {
+    if (rows.length) {
+      body.innerHTML =
+        '<div class="table-responsive">' +
+          '<table class="data-table">' +
+            '<thead><tr>' +
+              '<th>#</th><th>Customer</th><th>Phone</th><th>Status</th>' +
+              '<th>Days</th><th>Agent</th><th>Branch</th><th>Expiry Date</th>' +
+            '</tr></thead>' +
+            '<tbody>' + tbodyHtml + '</tbody>' +
+          '</table>' +
+        '</div>';
+    } else {
+      body.innerHTML = '<p style="text-align:center;padding:32px;color:#999;">No expired or expiring customers.</p>';
+    }
+  }
+  openModal('modal-expiry-notice');
 }
 
 function submitTermination(e) {
