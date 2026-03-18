@@ -2926,32 +2926,28 @@ function renderTopUpTable() {
   if (noticeEl) {
     const totalAlert = expired.length + nearlyExpired.length;
     if (totalAlert) {
-      var titleParts = [];
-      if (expired.length) titleParts.push(expired.length + ' expired');
-      if (nearlyExpired.length) titleParts.push(nearlyExpired.length + ' expiring within 7 days');
-      var iconCls = expired.length ? 'fa-triangle-exclamation' : 'fa-bell';
-      noticeEl.innerHTML = '<div class="expiry-notice-banner">' +
-        '<div class="expiry-notice-icon"><i class="fas ' + iconCls + '"></i></div>' +
-        '<div class="expiry-notice-content">' +
-          '<div class="expiry-notice-title">Follow-up Required — ' + titleParts.join(' & ') + '</div>' +
-          '<div class="expiry-notice-list">' +
-            nearlyExpired.map(function(c) {
-              const exp = parseLocalDate(c.endDate);
-              const daysLeft = Math.round((exp - today) / MS_PER_DAY);
-              return '<span class="expiry-notice-item"><i class="fas fa-clock" style="color:#f59e0b;margin-right:3px;"></i>' +
-                esc(c.name) + ' (' + esc(c.phone) + ') — <strong>' +
-                (daysLeft === 0 ? 'Today' : daysLeft + ' day' + (daysLeft > 1 ? 's' : '')) + '</strong></span>';
-            }).join('') +
-            expired.map(function(c) {
-              const exp = parseLocalDate(c.endDate);
-              const daysAgo = Math.abs(Math.round((exp - today) / MS_PER_DAY));
-              return '<span class="expiry-notice-item expiry-notice-item-expired"><i class="fas fa-circle-xmark" style="color:#ef4444;margin-right:3px;"></i>' +
-                esc(c.name) + ' (' + esc(c.phone) + ') — <strong>' + daysAgo + 'd ago</strong></span>';
-            }).join('') +
+      var cards = '';
+      if (expired.length) {
+        cards += '<div class="expiry-notice-card expiry-notice-card-expired">' +
+          '<div class="expiry-notice-card-icon"><i class="fas fa-circle-xmark"></i></div>' +
+          '<div class="expiry-notice-card-body">' +
+            '<div class="expiry-notice-card-count">' + expired.length + '</div>' +
+            '<div class="expiry-notice-card-label">Expired</div>' +
           '</div>' +
-        '</div>' +
-        '<button class="btn expiry-view-btn" onclick="openExpiryNoticeModal()"><i class="fas fa-eye"></i> View</button>' +
-      '</div>';
+          '<button class="btn expiry-view-btn expiry-view-btn-red" onclick="openExpiryNoticeModal(\'expired\')"><i class="fas fa-eye"></i> View</button>' +
+        '</div>';
+      }
+      if (nearlyExpired.length) {
+        cards += '<div class="expiry-notice-card expiry-notice-card-expiring">' +
+          '<div class="expiry-notice-card-icon expiry-notice-card-icon-warn"><i class="fas fa-clock"></i></div>' +
+          '<div class="expiry-notice-card-body">' +
+            '<div class="expiry-notice-card-count expiry-notice-card-count-warn">' + nearlyExpired.length + '</div>' +
+            '<div class="expiry-notice-card-label expiry-notice-card-label-warn">Expiring Soon</div>' +
+          '</div>' +
+          '<button class="btn expiry-view-btn" onclick="openExpiryNoticeModal(\'expiring\')"><i class="fas fa-eye"></i> View</button>' +
+        '</div>';
+      }
+      noticeEl.innerHTML = '<div class="expiry-notice-cards">' + cards + '</div>';
     } else {
       noticeEl.innerHTML = '';
     }
@@ -3012,7 +3008,7 @@ function renderTopUpTable() {
   }).join('');
 }
 
-function openExpiryNoticeModal() {
+function openExpiryNoticeModal(type) {
   const MS_PER_DAY = 86400000;
   var _now = new Date();
   const today = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate());
@@ -3030,19 +3026,38 @@ function openExpiryNoticeModal() {
     return exp && exp >= today && exp <= in7Days;
   });
 
-  // Sort: expired first (most overdue first), then expiring (soonest first)
+  // Sort: most overdue first for expired, soonest first for expiring
   expiredList.sort(function(a, b) { return parseLocalDate(a.endDate) - parseLocalDate(b.endDate); });
   nearlyExpiredList.sort(function(a, b) { return parseLocalDate(a.endDate) - parseLocalDate(b.endDate); });
 
   var rows = [];
-  expiredList.forEach(function(c) {
-    var exp = parseLocalDate(c.endDate);
-    rows.push({ c: c, exp: exp, type: 'expired', daysLeft: Math.round((exp - today) / MS_PER_DAY) });
+  var listsToShow = [];
+  if (type === 'expired') {
+    listsToShow.push({ list: expiredList, rowType: 'expired' });
+  } else if (type === 'expiring') {
+    listsToShow.push({ list: nearlyExpiredList, rowType: 'expiring' });
+  } else {
+    listsToShow.push({ list: expiredList, rowType: 'expired' });
+    listsToShow.push({ list: nearlyExpiredList, rowType: 'expiring' });
+  }
+  listsToShow.forEach(function(entry) {
+    entry.list.forEach(function(c) {
+      var exp = parseLocalDate(c.endDate);
+      rows.push({ c: c, exp: exp, type: entry.rowType, daysLeft: Math.round((exp - today) / MS_PER_DAY) });
+    });
   });
-  nearlyExpiredList.forEach(function(c) {
-    var exp = parseLocalDate(c.endDate);
-    rows.push({ c: c, exp: exp, type: 'expiring', daysLeft: Math.round((exp - today) / MS_PER_DAY) });
-  });
+
+  // Update modal title based on type
+  var modalTitle = g('expiry-notice-modal-title');
+  if (modalTitle) {
+    if (type === 'expired') {
+      modalTitle.innerHTML = '<i class="fas fa-circle-xmark" style="color:#ef4444;margin-right:8px;"></i>Expired Customers';
+    } else if (type === 'expiring') {
+      modalTitle.innerHTML = '<i class="fas fa-clock" style="color:#f59e0b;margin-right:8px;"></i>Expiring Customers';
+    } else {
+      modalTitle.innerHTML = '<i class="fas fa-bell" style="color:#f59e0b;margin-right:8px;"></i>Expired &amp; Expiring Customers';
+    }
+  }
 
   var tbodyHtml = rows.map(function(row, i) {
     var c = row.c;
@@ -3079,7 +3094,7 @@ function openExpiryNoticeModal() {
           '</table>' +
         '</div>';
     } else {
-      body.innerHTML = '<p style="text-align:center;padding:32px;color:#999;">No expired or expiring customers.</p>';
+      body.innerHTML = '<p style="text-align:center;padding:32px;color:#999;">No customers found.</p>';
     }
   }
   openModal('modal-expiry-notice');

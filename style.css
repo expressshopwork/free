@@ -2724,50 +2724,68 @@ input, select, textarea, button {
 }
 
 /* ── Top-Up Expiry Notice Banner ─────────────────────────── */
-.expiry-notice-banner {
+.expiry-notice-cards {
   display: flex;
-  align-items: flex-start;
   gap: 12px;
-  background: linear-gradient(135deg, #fff8e1 0%, #fff3cd 100%);
-  border: 1px solid #f59e0b;
-  border-left: 4px solid #f59e0b;
-  border-radius: 10px;
-  padding: 14px 18px;
+  flex-wrap: wrap;
   margin-bottom: 16px;
 }
-.expiry-notice-icon {
+.expiry-notice-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 10px;
+  padding: 12px 16px;
+  min-width: 200px;
+  flex: 1;
+}
+.expiry-notice-card-expired {
+  background: #fff1f0;
+  border: 1px solid #ef4444;
+  border-left: 4px solid #ef4444;
+}
+.expiry-notice-card-expiring {
+  background: #fff8e1;
+  border: 1px solid #f59e0b;
+  border-left: 4px solid #f59e0b;
+}
+.expiry-notice-card-icon {
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  background: #f59e0b;
+  width: 40px;
+  height: 40px;
+  background: #ef4444;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 1rem;
+  font-size: 1.1rem;
 }
-.expiry-notice-content {
+.expiry-notice-card-icon-warn {
+  background: #f59e0b;
+}
+.expiry-notice-card-body {
   flex: 1;
 }
-.expiry-notice-title {
-  font-weight: 700;
+.expiry-notice-card-count {
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #991b1b;
+}
+.expiry-notice-card-count-warn {
   color: #92400e;
-  font-size: 0.9rem;
-  margin-bottom: 6px;
 }
-.expiry-notice-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.expiry-notice-card-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #991b1b;
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
-.expiry-notice-item {
-  background: #fff;
-  border: 1px solid #f59e0b;
-  border-radius: 20px;
-  padding: 3px 12px;
-  font-size: 0.8rem;
-  color: #78350f;
+.expiry-notice-card-label-warn {
+  color: #92400e;
 }
 
 /* ── Top-Up Expiry Row Highlighting ──────────────────────── */
@@ -2831,6 +2849,10 @@ input, select, textarea, button {
   transition: background .15s;
 }
 .expiry-view-btn:hover { background: #d97706; }
+.expiry-view-btn-red {
+  background: #ef4444;
+}
+.expiry-view-btn-red:hover { background: #dc2626; }
 
 /* ── Inventory Badges ─────────────────────────────────────── */
 .inv-badge-status {
