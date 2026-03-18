@@ -473,6 +473,41 @@ const LS_KEYS = {
   session: 'smart5g_session'
 };
 
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+var sessionTimer = null;
+
+function startSessionTimer(remainingMs) {
+  clearSessionTimer();
+  var delay = (remainingMs !== undefined) ? remainingMs : SESSION_TIMEOUT_MS;
+  sessionTimer = setTimeout(function() {
+    performAutoLogout();
+  }, delay);
+}
+
+function clearSessionTimer() {
+  if (sessionTimer) { clearTimeout(sessionTimer); sessionTimer = null; }
+}
+
+function resetSessionTimer() {
+  if (!currentUser) return;
+  // Update loginTime in localStorage so page reloads also get the refreshed timestamp
+  var saved = lsLoad(LS_KEYS.session, null);
+  if (saved) { saved.loginTime = Date.now(); lsSave(LS_KEYS.session, saved); }
+  startSessionTimer();
+}
+
+function performAutoLogout() {
+  clearSessionTimer();
+  currentUser = null;
+  localStorage.removeItem(LS_KEYS.session);
+  var as = g('app-shell'); if (as) as.style.display = 'none';
+  var ls = g('login-screen'); if (ls) ls.style.display = 'flex';
+  var lf = g('login-form'); if (lf) lf.reset();
+  var errEl = g('login-error'); if (errEl) errEl.style.display = 'none';
+  var btn = g('login-submit-btn'); if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-right-to-bracket"></i> Sign In'; }
+  showToast('Your session has expired. Please sign in again.', 'warning');
+}
+
 function lsSave(key, data) {
   try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) { console.warn('localStorage save failed:', e); }
 }
@@ -4250,7 +4285,8 @@ function handleLogin(e) {
       // switchRole overwrites currentUser with a representative user for demo switching;
       // restore it to the authenticated user so all data filtering uses the correct identity.
       currentUser = user;
-      lsSave(LS_KEYS.session, user);
+      lsSave(LS_KEYS.session, Object.assign({}, user, { loginTime: Date.now() }));
+      startSessionTimer();
       var nameEl = g('topbar-name'); if (nameEl) nameEl.textContent = user.name;
       var avatarEl = g('topbar-avatar'); if (avatarEl) avatarEl.textContent = ini(user.name);
       navigateTo('dashboard', null);
@@ -4288,6 +4324,7 @@ function toggleLoginPwd() {
 
 function handleLogout() {
   showConfirm('Are you sure you want to sign out of Smart 5G Dashboard?', function() {
+    clearSessionTimer();
     currentUser = null;
     localStorage.removeItem(LS_KEYS.session);
     var as = g('app-shell'); if (as) as.style.display = 'none';
@@ -5096,15 +5133,22 @@ document.addEventListener('DOMContentLoaded', function() {
   // Restore login session if user was previously authenticated
   var savedSession = lsLoad(LS_KEYS.session, null);
   if (savedSession && savedSession.username) {
-    var roleMap = { 'Admin': 'admin', 'Cluster': 'cluster', 'Supervisor': 'supervisor', 'Agent': 'agent' };
-    currentUser = savedSession;
-    var ls = g('login-screen'); if (ls) ls.style.display = 'none';
-    var as = g('app-shell'); if (as) as.style.display = 'flex';
-    switchRole(roleMap[savedSession.role] || 'user');
-    currentUser = savedSession;
-    var nameEl = g('topbar-name'); if (nameEl) nameEl.textContent = savedSession.name;
-    var avatarEl = g('topbar-avatar'); if (avatarEl) avatarEl.textContent = ini(savedSession.name);
-    navigateTo('dashboard', null);
+    var sessionAge = savedSession.loginTime ? (Date.now() - savedSession.loginTime) : SESSION_TIMEOUT_MS;
+    if (sessionAge >= SESSION_TIMEOUT_MS) {
+      // Session has expired – clear it and stay on login screen
+      localStorage.removeItem(LS_KEYS.session);
+    } else {
+      var roleMap = { 'Admin': 'admin', 'Cluster': 'cluster', 'Supervisor': 'supervisor', 'Agent': 'agent' };
+      currentUser = savedSession;
+      var ls = g('login-screen'); if (ls) ls.style.display = 'none';
+      var as = g('app-shell'); if (as) as.style.display = 'flex';
+      switchRole(roleMap[savedSession.role] || 'user');
+      currentUser = savedSession;
+      var nameEl = g('topbar-name'); if (nameEl) nameEl.textContent = savedSession.name;
+      var avatarEl = g('topbar-avatar'); if (avatarEl) avatarEl.textContent = ini(savedSession.name);
+      navigateTo('dashboard', null);
+      startSessionTimer(SESSION_TIMEOUT_MS - sessionAge);
+    }
   }
 
   // Populate shop stock branch filter
@@ -5126,6 +5170,12 @@ document.addEventListener('click', function(e) {
       panel.style.display = 'none';
     }
   }
+  resetSessionTimer();
+});
+
+// Reset session timer on keyboard and mouse activity so active users are not signed out
+['mousemove', 'keydown'].forEach(function(evt) {
+  document.addEventListener(evt, function() { resetSessionTimer(); }, { passive: true });
 });
 
 // ============================================================
