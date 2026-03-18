@@ -3721,7 +3721,7 @@ function updateDepositKpis() {
   const el1 = g('dep-kpi-total'); if (el1) el1.textContent = fmtMoney(total);
   const el2 = g('dep-kpi-count'); if (el2) el2.textContent = baseDeposits.length;
   const el3 = g('dep-kpi-agents'); if (el3) el3.textContent = agents.size;
-  const el4 = g('dep-kpi-cash'); if (el4) el4.textContent = fmtMoney(totalCash);
+  const el4 = g('dep-kpi-cash'); if (el4) el4.textContent = fmtMoney(totalCash + khrToUsd(totalRiel));
   const el5 = g('dep-kpi-credit'); if (el5) el5.textContent = fmtMoney(totalCredit);
   renderDepositChart();
 }
