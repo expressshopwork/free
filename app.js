@@ -654,6 +654,7 @@ function populateBranchSelects() {
 // Date Helpers
 // ------------------------------------------------------------
 function ymOf(dateStr) { return dateStr ? dateStr.substring(0, 7) : ''; }
+function dateOf(ts) { return ts && typeof ts === 'string' ? ts.substring(0, 10) : ''; }
 function ymNow() { return new Date().toISOString().substring(0, 7); }
 function ymPrev() { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString().substring(0, 7); }
 function ymLabel(ym) {
@@ -1573,9 +1574,9 @@ function renderSaleTable() {
 
   // Always show all active item columns regardless of whether they have data
   const unitItems = itemCatalogue.filter(function(x) { return x.group === 'unit' && x.status === 'active'; });
-  const dollarItems = itemCatalogue.filter(function(x) { return x.group === 'dollar' && x.status === 'active' && x.id !== ITEM_ID_REVENUE && x.id !== 'i10'; });
+  const dollarItems = itemCatalogue.filter(function(x) { return x.group === 'dollar' && x.status === 'active' && x.id !== ITEM_ID_REVENUE; });
 
-  let headerRow1 = '<tr><th rowspan="2">Agent</th><th rowspan="2">Branch</th><th rowspan="2">BN</th>';
+  let headerRow1 = '<tr><th rowspan="2">Agent</th><th rowspan="2">Branch</th><th rowspan="2">Submit Date</th>';
   if (unitItems.length) headerRow1 += '<th colspan="' + unitItems.length + '" class="th-group-unit">Unit Group</th>';
   if (dollarItems.length) headerRow1 += '<th colspan="' + dollarItems.length + '" class="th-group-dollar">Dollar Group</th>';
   headerRow1 += '<th rowspan="2" class="td-buy-number">Total Revenue</th><th rowspan="2">Remark</th><th rowspan="2">Actions</th></tr>';
@@ -1599,16 +1600,16 @@ function renderSaleTable() {
       return '<td class="td-dollar">' + (amt > 0 ? fmtMoney(amt, esc(item.currency) + ' ') : '') + '</td>';
     }).join('');
     const saleRev = s.dollarItems && s.dollarItems[ITEM_ID_REVENUE] ? s.dollarItems[ITEM_ID_REVENUE] : 0;
-    const buyNum = s.dollarItems && s.dollarItems['i10'] ? s.dollarItems['i10'] : '';
 
     // Determine if the current user can edit/delete this record
     const canEdit = canModifySaleRecord(s);
 
     const avIdx = Math.abs((s.agent.charCodeAt(0) || 0)) % 8;
+    const submitDate = dateOf(s.submittedAt) || dateOf(s.date);
     return '<tr>' +
       '<td><div class="name-cell"><span class="avatar-circle av-' + avIdx + '" style="width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;color:#fff;margin-right:8px;">' + esc(ini(s.agent)) + '</span>' + esc(s.agent) + '</div></td>' +
       '<td>' + esc(s.branch) + '</td>' +
-      '<td class="td-dollar">' + (buyNum ? fmtMoney(buyNum, '$ ') : '') + '</td>' +
+      '<td style="white-space:nowrap;font-size:0.82rem;color:#555;">' + esc(submitDate) + '</td>' +
       unitCells +
       dollarCells +
       '<td class="td-buy-number">' + fmtMoney(saleRev) + '</td>' +
@@ -1698,7 +1699,7 @@ function downloadSaleCSV() {
 
   // Only include item columns that have at least one non-zero value in the filtered rows
   const allUnitItems = itemCatalogue.filter(function(x) { return x.group === 'unit' && x.status === 'active'; });
-  const allDollarItems = itemCatalogue.filter(function(x) { return x.group === 'dollar' && x.status === 'active' && x.id !== ITEM_ID_REVENUE && x.id !== 'i10'; });
+  const allDollarItems = itemCatalogue.filter(function(x) { return x.group === 'dollar' && x.status === 'active' && x.id !== ITEM_ID_REVENUE; });
   const unitItems = allUnitItems.filter(function(item) { return rows.some(function(s) { return s.items && s.items[item.id] > 0; }); });
   const dollarItems = allDollarItems.filter(function(item) { return rows.some(function(s) { return s.dollarItems && s.dollarItems[item.id] > 0; }); });
 
@@ -1709,14 +1710,14 @@ function downloadSaleCSV() {
 
   const unitHeaders = unitItems.map(function(x) { return escape(x.shortcut || x.name); });
   const dollarHeaders = dollarItems.map(function(x) { return escape(x.shortcut || x.name); });
-  const header = ['Agent', 'Branch', 'BN'].concat(unitHeaders).concat(dollarHeaders).concat(['Total Revenue', 'Remark']).map(escape).join(',');
+  const header = ['Agent', 'Branch', 'Submit Date'].concat(unitHeaders).concat(dollarHeaders).concat(['Total Revenue', 'Remark']).map(escape).join(',');
 
   const lines = rows.map(function(s) {
-    const buyNum = s.dollarItems && s.dollarItems['i10'] ? s.dollarItems['i10'] : '';
+    const submitDate = dateOf(s.submittedAt) || dateOf(s.date);
     const unitCols = unitItems.map(function(item) { return escape(s.items && s.items[item.id] ? s.items[item.id] : ''); });
     const dollarCols = dollarItems.map(function(item) { return escape(s.dollarItems && s.dollarItems[item.id] ? s.dollarItems[item.id] : ''); });
     const rev = s.dollarItems && s.dollarItems[ITEM_ID_REVENUE] ? s.dollarItems[ITEM_ID_REVENUE] : '';
-    return [escape(s.agent), escape(s.branch), escape(buyNum)]
+    return [escape(s.agent), escape(s.branch), escape(submitDate)]
       .concat(unitCols).concat(dollarCols)
       .concat([escape(rev), escape(s.note || s.remark || '')])
       .join(',');
