@@ -19,7 +19,7 @@ The script source lives in [`gas/Code.gs`](gas/Code.gs).
 | Terminations  | id, customerId, name, phone, reason, agent, branch, date, … |
 | OutCoverage   | id, name, phone, agent, branch, date, …                    |
 | Promotions    | id, title, startDate, endDate, remark, …                   |
-| Deposits      | id, amount, agent, branch, date, …                         |
+| **Deposits**  | id, agent, branch, cash, **creditAmount**, riel, **cashDetail**, amount, date, **submittedAt**, remark, status, approvedBy, approvedAt |
 | KPI           | id, agent, branch, date, …                                 |
 | Items         | id, name, price, …                                         |
 | Coverage      | id, lat, lng, …                                            |
