@@ -655,8 +655,8 @@ function populateBranchSelects() {
 // ------------------------------------------------------------
 function ymOf(dateStr) { return dateStr ? dateStr.substring(0, 7) : ''; }
 function dateOf(ts) { return ts && typeof ts === 'string' ? ts.substring(0, 10) : ''; }
-function ymNow() { return new Date().toISOString().substring(0, 7); }
-function ymPrev() { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString().substring(0, 7); }
+function ymNow() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+function ymPrev() { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
 function ymLabel(ym) {
   const parts = ym.split('-');
   return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+parts[1] - 1] + ' ' + parts[0];
@@ -666,7 +666,7 @@ function last7Months() {
   const d = new Date();
   for (let i = 6; i >= 0; i--) {
     const t = new Date(d.getFullYear(), d.getMonth() - i, 1);
-    r.push(t.toISOString().substring(0, 7));
+    r.push(t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0'));
   }
   return r;
 }
@@ -694,6 +694,12 @@ function toLocalDateStr(str) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str; // already normalised
   var d = parseLocalDate(str);
   if (!d) return str;
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// Returns today's date as a "YYYY-MM-DD" string in the local timezone.
+function todayStr() {
+  var d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
@@ -1274,7 +1280,7 @@ function openNewSaleModal(sale) {
   } else {
     if (title) title.textContent = 'New Sale';
     if (btn) btn.textContent = 'Save Sale';
-    g('sale-date').value = new Date().toISOString().split('T')[0];
+    g('sale-date').value = todayStr();
     if (currentUser) {
       const agentEl = g('sale-agent-name');
       if (agentEl) { agentEl.value = currentUser.name || ''; if (currentRole === 'agent' || currentRole === 'supervisor') agentEl.readOnly = true; }
@@ -1671,7 +1677,7 @@ function updateTotalBar(units, dollar) {
 // Sale CSV Download
 // ------------------------------------------------------------
 function openDownloadModal() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayStr();
   const fromEl = g('dl-date-from');
   const toEl = g('dl-date-to');
   if (fromEl && !fromEl.value) fromEl.value = today.slice(0, 7) + '-01';
@@ -2510,7 +2516,7 @@ function openCustomerModal(type, item) {
       if (g('nc-lng')) g('nc-lng').value = item.lng || '';
     } else {
       if (title) title.textContent = 'Add New Customer';
-      g('nc-date').value = new Date().toISOString().split('T')[0];
+      g('nc-date').value = todayStr();
       if (currentUser) {
         const agEl = g('nc-agent'); if (agEl) { agEl.value = currentUser.name || ''; if (currentRole === 'agent' || currentRole === 'supervisor') agEl.readOnly = true; }
         const brEl = g('nc-branch'); if (brEl && currentUser.branch) { brEl.value = currentUser.branch; if (currentRole === 'agent' || currentRole === 'supervisor') brEl.disabled = true; }
@@ -2577,7 +2583,7 @@ function openCustomerModal(type, item) {
       toggleTuLatlongRow(item.tuStatus || 'active', item.lat, item.lng);
     } else {
       if (title) title.textContent = 'Add Top Up';
-      g('tu-date').value = new Date().toISOString().split('T')[0];
+      g('tu-date').value = todayStr();
       toggleTuLatlongRow('active');
       if (currentUser) {
         const agEl = g('tu-agent'); if (agEl) { agEl.value = currentUser.name || ''; if (currentRole === 'agent' || currentRole === 'supervisor') agEl.readOnly = true; }
@@ -2605,7 +2611,7 @@ function openCustomerModal(type, item) {
       const termLngEl = g('term-lng'); if (termLngEl) termLngEl.value = item.lng || '';
     } else {
       if (title) title.textContent = 'Add Termination';
-      g('term-date').value = new Date().toISOString().split('T')[0];
+      g('term-date').value = todayStr();
       if (currentUser) {
         const agEl = g('term-agent'); if (agEl) { agEl.value = currentUser.name || ''; if (currentRole === 'agent' || currentRole === 'supervisor') agEl.readOnly = true; }
         const brEl = g('term-branch'); if (brEl && currentUser.branch) { brEl.value = currentUser.branch; if (currentRole === 'agent' || currentRole === 'supervisor') brEl.disabled = true; }
@@ -3245,7 +3251,7 @@ function deleteOutCoverage(id) {
 // ------------------------------------------------------------
 function isPromoExpired(p) {
   if (!p.endDate) return false;
-  const today = new Date(new Date().toISOString().split('T')[0]);
+  const today = new Date(todayStr());
   return new Date(p.endDate) < today;
 }
 
@@ -3268,7 +3274,7 @@ function openNewPromotionModal(item) {
   } else {
     if (title) title.textContent = 'New Promotion';
     if (btn) btn.textContent = 'Add Promotion';
-    const s = g('np-start'); if (s) s.value = new Date().toISOString().split('T')[0];
+    const s = g('np-start'); if (s) s.value = todayStr();
   }
   openModal('modal-newPromotion');
 }
@@ -3391,7 +3397,7 @@ function restorePromotion(id) {
   if (idx < 0) return;
   var today = new Date();
   var future = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 30);
-  promotionList[idx].endDate = future.toISOString().split('T')[0];
+  promotionList[idx].endDate = future.getFullYear() + '-' + String(future.getMonth() + 1).padStart(2, '0') + '-' + String(future.getDate()).padStart(2, '0');
   renderPromotionCards();
   showToast('Promotion restored for 30 days.', 'success');
   syncSheet('Promotions', promotionList);
@@ -3593,7 +3599,7 @@ function openDepositModal(item) {
   } else {
     if (title) title.textContent = 'Add Deposit';
     if (btn) btn.textContent = 'Add Deposit';
-    const dtEl = g('dep-date'); if (dtEl) dtEl.value = new Date().toISOString().split('T')[0];
+    const dtEl = g('dep-date'); if (dtEl) dtEl.value = todayStr();
     if (currentUser) {
       if (agEl) {
         agEl.value = currentUser.name || '';
@@ -3696,7 +3702,7 @@ function approveDeposit(id) {
     if (idx >= 0) {
       depositList[idx].status = 'approved';
       depositList[idx].approvedBy = currentUser ? currentUser.name : 'Supervisor';
-      depositList[idx].approvedAt = new Date().toISOString().split('T')[0];
+      depositList[idx].approvedAt = todayStr();
       renderDepositTable();
       updateDepositKpis();
       syncSheet('Deposits', depositList);
@@ -3821,7 +3827,7 @@ function renderDepositTable() {
       '<td style="color:#8B6914;font-weight:600;">' + (d.riel ? formatKHR(d.riel) : '—') + '</td>' +
       '<td style="color:#1565C0;font-weight:600;">' + (dCreditAmt ? '$' + Number(dCreditAmt).toFixed(2) : '—') + '</td>' +
       '<td style="font-weight:700;color:#1B7D3D;">$' + Number((d.cash || 0) + khrToUsd(d.riel) + (dCreditAmt || 0)).toFixed(2) + '</td>' +
-      '<td>' + esc(d.date || '') + '</td>' +
+      '<td>' + esc(toLocalDateStr(d.date) || '') + '</td>' +
       '<td style="color:#888;font-size:0.8rem;">' + esc(d.remark || d.note || '') + '</td>' +
       '<td><span class="pill ' + statusPill + '">' + statusLabel + '</span></td>' +
       '<td style="white-space:nowrap;">' +
@@ -4284,7 +4290,7 @@ function setKpiMonth(mode) {
   } else if (mode === 'prev') {
     const d = new Date();
     d.setMonth(d.getMonth() - 1);
-    kpiSelectedMonth = d.toISOString().substring(0, 7);
+    kpiSelectedMonth = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
   } else {
     kpiSelectedMonth = '';
   }
@@ -4784,7 +4790,7 @@ function submitAddStock(e) {
   var item = itemCatalogue.find(function(x) { return x.id === itemId; });
   if (!item) { showToast('Item not found.', 'error'); return; }
   var editId = rv('addstock-edit-id');
-  var now = new Date().toISOString().slice(0, 10);
+  var now = todayStr();
   var byUser = currentUser ? currentUser.name : currentRole;
 
   var existing = invStock.find(function(s) { return s.id === editId; }) ||
@@ -4868,7 +4874,7 @@ function submitAllocationRequest(e) {
     return;
   }
 
-  var now = new Date().toISOString().slice(0, 10);
+  var now = todayStr();
   var byUser = currentUser ? currentUser.name : currentRole;
   invRequests.push({
     id: 'ir' + Date.now(),
@@ -4946,7 +4952,7 @@ function processAllocation(action) {
   var req = invRequests.find(function(r) { return r.id === _reviewAllocId; });
   if (!req) return;
   var reviewNote = g('review-note-input') ? g('review-note-input').value.trim() : '';
-  var now = new Date().toISOString().slice(0, 10);
+  var now = todayStr();
   var byUser = currentUser ? currentUser.name : currentRole;
 
   if (action === 'approved') {
@@ -5148,8 +5154,8 @@ function _getApprovalFormVars(type, data) {
     formTitle: isDeposit ? 'Daily Cash & Credit Deposit Approval' : 'Stock Allocation Approval',
     submitter: isDeposit ? (data.agent || '') : (data.requestedBy || ''),
     approver:  isDeposit ? (data.approvedBy || '') : (data.reviewedBy || ''),
-    dateSubmitted: isDeposit ? (data.date || (data.submittedAt ? data.submittedAt.split('T')[0] : '')) : (data.date || ''),
-    dateApproved:  isDeposit ? (data.approvedAt || '') : (data.reviewedAt || ''),
+    dateSubmitted: isDeposit ? toLocalDateStr(data.date || (data.submittedAt ? data.submittedAt.split('T')[0] : '')) : (data.date || ''),
+    dateApproved:  isDeposit ? toLocalDateStr(data.approvedAt || '') : (data.reviewedAt || ''),
     branch: isDeposit ? (data.branch || '') : '',
     remark: isDeposit ? (data.remark || '') : (data.reviewNote || data.purpose || '')
   };
@@ -5635,7 +5641,7 @@ function submitCoverageLocation(e) {
     showToast('Please select at least one product.', 'error'); return;
   }
 
-  var today = new Date().toISOString().slice(0, 10);
+  var today = todayStr();
   var f = g('form-coverage');
   var editId = f ? f.getAttribute('data-edit-id') : null;
 
