@@ -3518,6 +3518,12 @@ function _resetDenomSection() {
   var khrR = g('khr-denom-total-row'); if (khrR) khrR.textContent = '0 ៛';
 }
 
+// Returns the credit amount from a deposit record, handling both the new
+// `creditAmount` field and the legacy `credit` field for backward compatibility.
+function _depCreditAmt(deposit) {
+  return deposit.creditAmount !== undefined ? deposit.creditAmount : (deposit.credit || 0);
+}
+
 function _loadDenomSection(cashDetail) {
   if (!cashDetail) return;
   var section = g('denom-section');
@@ -3565,7 +3571,7 @@ function openDepositModal(item) {
     if (agEl) agEl.value = item.agent || '';
     if (brEl) brEl.value = item.branch || '';
     const cashEl = g('dep-cash'); if (cashEl) cashEl.value = item.cash || '';
-    const creditEl = g('dep-credit'); if (creditEl) creditEl.value = item.credit || '';
+    const creditEl = g('dep-credit'); if (creditEl) creditEl.value = _depCreditAmt(item) || '';
     const rielEl = g('dep-riel'); if (rielEl) rielEl.value = item.riel || '';
     const dtEl = g('dep-date'); if (dtEl) dtEl.value = item.date || '';
     const ntEl = g('dep-remark'); if (ntEl) ntEl.value = item.remark || item.note || '';
@@ -3622,18 +3628,20 @@ function submitDeposit(e) {
     var qty = el ? (parseInt(el.value) || 0) : 0;
     if (qty > 0) cashDetailKhr.push({ denom: d, qty: qty });
   });
+  var existingRecord = editId ? depositList.find(function(x){return x.id===editId;}) : null;
   const obj = {
     id: editId || uid(),
     agent: rv('dep-agent'),
     branch: rv('dep-branch'),
     cash: cash,
-    credit: credit,
+    creditAmount: credit,
     riel: riel,
     cashDetail: (cashDetailUsd.length || cashDetailKhr.length) ? { usd: cashDetailUsd, khr: cashDetailKhr } : null,
     amount: cash + credit,
     date: rv('dep-date'),
+    submittedAt: (existingRecord && existingRecord.submittedAt) || new Date().toISOString(),
     remark: rv('dep-remark'),
-    status: editId ? (depositList.find(function(x){return x.id===editId;})||{}).status || 'pending' : 'pending'
+    status: editId ? (existingRecord || {}).status || 'pending' : 'pending'
   };
   if (!obj.agent) { showAlert('Please enter agent name'); return; }
   if (obj.amount <= 0 && riel <= 0) { showAlert('Please enter a cash, credit, and/or KHR riel amount greater than zero'); return; }
@@ -3698,7 +3706,7 @@ function updateDepositKpis() {
   const baseDeposits = getBaseRecordsForRole(depositList);
   let totalCash = 0, totalCredit = 0;
   const agents = new Set();
-  baseDeposits.forEach(function(d) { totalCash += (d.cash || 0); totalCredit += (d.credit || 0); agents.add(d.agent); });
+  baseDeposits.forEach(function(d) { totalCash += (d.cash || 0); totalCredit += _depCreditAmt(d); agents.add(d.agent); });
   const total = totalCash + totalCredit;
   const el1 = g('dep-kpi-total'); if (el1) el1.textContent = fmtMoney(total);
   const el2 = g('dep-kpi-count'); if (el2) el2.textContent = baseDeposits.length;
@@ -3725,7 +3733,7 @@ function renderDepositChart() {
       const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
       labels.push(key.slice(5));
       let c = 0, cr = 0;
-      baseDepositList.forEach(function(dep) { if (dep.date === key) { c += (dep.cash||0); cr += (dep.credit||0); } });
+      baseDepositList.forEach(function(dep) { if (dep.date === key) { c += (dep.cash||0); cr += _depCreditAmt(dep); } });
       cashData.push(c); creditData.push(cr);
     }
   } else if (period === 'monthly') {
@@ -3734,7 +3742,7 @@ function renderDepositChart() {
       const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
       labels.push(ymLabel(key));
       let c = 0, cr = 0;
-      baseDepositList.forEach(function(dep) { if (dep.date && dep.date.startsWith(key)) { c += (dep.cash||0); cr += (dep.credit||0); } });
+      baseDepositList.forEach(function(dep) { if (dep.date && dep.date.startsWith(key)) { c += (dep.cash||0); cr += _depCreditAmt(dep); } });
       cashData.push(c); creditData.push(cr);
     }
   } else {
@@ -3742,7 +3750,7 @@ function renderDepositChart() {
       const yr = now.getFullYear() - i;
       labels.push(String(yr));
       let c = 0, cr = 0;
-      baseDepositList.forEach(function(dep) { if (dep.date && dep.date.startsWith(String(yr))) { c += (dep.cash||0); cr += (dep.credit||0); } });
+      baseDepositList.forEach(function(dep) { if (dep.date && dep.date.startsWith(String(yr))) { c += (dep.cash||0); cr += _depCreditAmt(dep); } });
       cashData.push(c); creditData.push(cr);
     }
   }
@@ -3794,13 +3802,14 @@ function renderDepositTable() {
     const statusLabel = status === 'approved' ? 'Approved' : 'Pending';
     const approveBtn = (canApprove && status !== 'approved') ? '<button class="btn-edit" onclick="approveDeposit(\'' + esc(d.id) + '\')" title="Approve"><i class="fas fa-check-circle"></i></button> ' : '';
     const canEdit = canModifyRecord(d);
+    var dCreditAmt = _depCreditAmt(d);
     return '<tr>' +
       '<td>' + (i + 1) + '</td>' +
       '<td><div class="name-cell"><span class="avatar-circle av-' + avIdx + '" style="width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;color:#fff;margin-right:8px;">' + esc(ini(d.agent)) + '</span>' + esc(d.agent) + '</div></td>' +
       '<td>' + esc(d.branch || '') + '</td>' +
       '<td style="color:#1B7D3D;font-weight:600;">' + (d.cash ? '$' + Number(d.cash).toFixed(2) : '—') + '</td>' +
-      '<td style="color:#1565C0;font-weight:600;">' + (d.credit ? '$' + Number(d.credit).toFixed(2) : '—') + '</td>' +
-      '<td style="font-weight:700;color:#1B7D3D;">$' + Number((d.cash || 0) + (d.credit || 0)).toFixed(2) + '</td>' +
+      '<td style="color:#1565C0;font-weight:600;">' + (dCreditAmt ? '$' + Number(dCreditAmt).toFixed(2) : '—') + '</td>' +
+      '<td style="font-weight:700;color:#1B7D3D;">$' + Number((d.cash || 0) + (dCreditAmt || 0)).toFixed(2) + '</td>' +
       '<td>' + esc(d.date || '') + '</td>' +
       '<td style="color:#888;font-size:0.8rem;">' + esc(d.remark || d.note || '') + '</td>' +
       '<td><span class="pill ' + statusPill + '">' + statusLabel + '</span></td>' +
@@ -3846,9 +3855,10 @@ function renderDepositSummaryView() {
   baseDepositList.forEach(function(d) {
     if (!agentMap[d.agent]) agentMap[d.agent] = { cash: 0, credit: 0, total: 0, count: 0, branch: d.branch || '' };
     var ag = agentMap[d.agent];
+    var dCreditAmt = _depCreditAmt(d);
     ag.cash += (d.cash || 0);
-    ag.credit += (d.credit || 0);
-    ag.total += (d.cash || 0) + (d.credit || 0);
+    ag.credit += dCreditAmt;
+    ag.total += (d.cash || 0) + dCreditAmt;
     ag.count++;
   });
 
@@ -5067,9 +5077,9 @@ function showApprovalFormModal(type, data) {
       '<tr><td style="padding:7px 12px;font-weight:600;color:#555;background:#f5f7fa;border-bottom:1px solid #eee;width:45%;">Cash Amount</td>' +
         '<td style="padding:7px 12px;border-bottom:1px solid #eee;font-weight:700;color:#1B7D3D;">$' + (data.cash ? Number(data.cash).toFixed(2) : '0.00') + '</td></tr>' +
       '<tr><td style="padding:7px 12px;font-weight:600;color:#555;background:#f5f7fa;border-bottom:1px solid #eee;">Credit Amount</td>' +
-        '<td style="padding:7px 12px;border-bottom:1px solid #eee;font-weight:700;color:#1565C0;">$' + (data.credit ? Number(data.credit).toFixed(2) : '0.00') + '</td></tr>' +
+        '<td style="padding:7px 12px;border-bottom:1px solid #eee;font-weight:700;color:#1565C0;">$' + (_depCreditAmt(data) ? Number(_depCreditAmt(data)).toFixed(2) : '0.00') + '</td></tr>' +
       '<tr><td style="padding:7px 12px;font-weight:600;color:#555;background:#f5f7fa;border-bottom:1px solid #eee;">Total Amount</td>' +
-        '<td style="padding:7px 12px;border-bottom:1px solid #eee;font-weight:700;color:#E65100;">$' + ((Number(data.cash)||0) + (Number(data.credit)||0)).toFixed(2) + '</td></tr>';
+        '<td style="padding:7px 12px;border-bottom:1px solid #eee;font-weight:700;color:#E65100;">$' + ((Number(data.cash)||0) + _depCreditAmt(data)).toFixed(2) + '</td></tr>';
   } else {
     detailRows =
       '<tr><td style="padding:7px 12px;font-weight:600;color:#555;background:#f5f7fa;border-bottom:1px solid #eee;width:45%;">Item Name</td>' +
@@ -5125,7 +5135,7 @@ function _getApprovalFormVars(type, data) {
     formTitle: isDeposit ? 'Daily Cash & Credit Deposit Approval' : 'Stock Allocation Approval',
     submitter: isDeposit ? (data.agent || '') : (data.requestedBy || ''),
     approver:  isDeposit ? (data.approvedBy || '') : (data.reviewedBy || ''),
-    dateSubmitted: data.date || '',
+    dateSubmitted: isDeposit ? (data.date || (data.submittedAt ? data.submittedAt.split('T')[0] : '')) : (data.date || ''),
     dateApproved:  isDeposit ? (data.approvedAt || '') : (data.reviewedAt || ''),
     branch: isDeposit ? (data.branch || '') : '',
     remark: isDeposit ? (data.remark || '') : (data.reviewNote || data.purpose || '')
@@ -5142,8 +5152,8 @@ function printApprovalForm() {
   if (v.isDeposit) {
     detailHtml =
       '<tr><td class="lbl">Cash Amount</td><td class="val" style="color:#1B7D3D;">$' + (data.cash ? Number(data.cash).toFixed(2) : '0.00') + '</td></tr>' +
-      '<tr><td class="lbl">Credit Amount</td><td class="val" style="color:#1565C0;">$' + (data.credit ? Number(data.credit).toFixed(2) : '0.00') + '</td></tr>' +
-      '<tr><td class="lbl">Total Amount</td><td class="val" style="font-weight:700;color:#E65100;">$' + ((Number(data.cash)||0) + (Number(data.credit)||0)).toFixed(2) + '</td></tr>';
+      '<tr><td class="lbl">Credit Amount</td><td class="val" style="color:#1565C0;">$' + (_depCreditAmt(data) ? Number(_depCreditAmt(data)).toFixed(2) : '0.00') + '</td></tr>' +
+      '<tr><td class="lbl">Total Amount</td><td class="val" style="font-weight:700;color:#E65100;">$' + ((Number(data.cash)||0) + _depCreditAmt(data)).toFixed(2) + '</td></tr>';
   } else {
     detailHtml =
       '<tr><td class="lbl">Item Name</td><td class="val">' + _escHtml(data.itemName) + '</td></tr>' +
@@ -5226,8 +5236,8 @@ function emailApprovalForm() {
 
   if (v.isDeposit) {
     bodyLines.push('Cash Amount     : $' + (data.cash ? Number(data.cash).toFixed(2) : '0.00'));
-    bodyLines.push('Credit Amount   : $' + (data.credit ? Number(data.credit).toFixed(2) : '0.00'));
-    bodyLines.push('Total Amount    : $' + ((Number(data.cash)||0) + (Number(data.credit)||0)).toFixed(2));
+    bodyLines.push('Credit Amount   : $' + (_depCreditAmt(data) ? Number(_depCreditAmt(data)).toFixed(2) : '0.00'));
+    bodyLines.push('Total Amount    : $' + ((Number(data.cash)||0) + _depCreditAmt(data)).toFixed(2));
   } else {
     bodyLines.push('Item Name       : ' + (data.itemName || ''));
     bodyLines.push('Quantity        : ' + (data.qty || 0));
