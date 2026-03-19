@@ -32,6 +32,12 @@ The value is saved in the record as **`endDate`** and must be stored in the **`e
 
 The Apps Script (`gas/Code.gs`) automatically adds the `endDate` column if it is missing when the first sync is performed — no manual sheet editing is required.
 
+### Deposits — approval columns (`status`, `approvedBy`, `approvedAt`)
+
+When a supervisor approves a deposit the record gains three fields: `status` (set to `"approved"`), `approvedBy`, and `approvedAt`.  
+The Apps Script automatically creates these columns in the *Deposits* sheet the first time a sync containing them is performed.  
+**If the Deposits sheet was created before these columns existed, run *Sync Up* once from the admin panel so the script can add the missing headers — after that, approval status will be saved and read back correctly.**
+
 ---
 
 ## How to deploy / redeploy the Apps Script Web App

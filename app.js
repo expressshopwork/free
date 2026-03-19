@@ -3744,6 +3744,7 @@ function editDeposit(id) {
   const item = depositList.find(function(x) { return x.id === id; });
   if (!item) return;
   if (!canModifyRecord(item)) { showAlert('You do not have permission to edit this record.', 'error'); return; }
+  if (item.status === 'approved' && currentRole !== 'admin') { showAlert('This deposit has already been approved and cannot be edited.', 'warning'); return; }
   openDepositModal(item);
 }
 
@@ -3751,6 +3752,7 @@ function deleteDeposit(id) {
   const item = depositList.find(function(x) { return x.id === id; });
   if (!item) return;
   if (!canModifyRecord(item)) { showAlert('You do not have permission to delete this record.', 'error'); return; }
+  if (item.status === 'approved' && currentRole !== 'admin') { showAlert('This deposit has already been approved and cannot be deleted.', 'warning'); return; }
   showConfirm('Are you sure you want to delete this deposit record? This action cannot be undone.', function() {
     depositList = depositList.filter(function(x) { return x.id !== id; });
     renderDepositTable();
@@ -3884,7 +3886,8 @@ function renderDepositTable() {
     const statusPill = status === 'approved' ? 'pill-green' : 'pill-orange';
     const statusLabel = status === 'approved' ? 'Approved' : 'Pending';
     const approveBtn = (canApprove && status !== 'approved') ? '<button class="btn-edit" onclick="approveDeposit(\'' + esc(d.id) + '\')" title="Approve"><i class="fas fa-check-circle"></i></button> ' : '';
-    const canEdit = canModifyRecord(d);
+    // Approved records may only be edited/deleted by admin
+    const canEdit = canModifyRecord(d) && (status !== 'approved' || currentRole === 'admin');
     var dCreditAmt = _depCreditAmt(d);
     return '<tr>' +
       '<td>' + (i + 1) + '</td>' +
