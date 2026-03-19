@@ -3092,6 +3092,9 @@ function openExpiryNoticeModal(type) {
     var daysText = row.daysLeft < 0
       ? Math.abs(row.daysLeft) + 'd ago'
       : (row.daysLeft === 0 ? 'Today' : row.daysLeft + 'd left');
+    var actionBtns =
+      '<button class="btn btn-sm btn-primary" style="margin-right:4px;" onclick="moveExpiryToActive(\'' + esc(c.id) + '\')" title="Renew subscription and move to Top Up list"><i class="fas fa-rotate-right"></i> Active</button>' +
+      '<button class="btn btn-sm btn-danger" onclick="moveExpiryToTerminate(\'' + esc(c.id) + '\')" title="Terminate service and move to Terminate list"><i class="fas fa-ban"></i> Terminate</button>';
     return '<tr>' +
       '<td>' + (i + 1) + '</td>' +
       '<td>' + esc(c.name) + '</td>' +
@@ -3101,6 +3104,7 @@ function openExpiryNoticeModal(type) {
       '<td>' + esc(c.agent || '') + '</td>' +
       '<td>' + esc(c.branch || '') + '</td>' +
       '<td>' + esc(displayDate) + '</td>' +
+      '<td style="white-space:nowrap;">' + actionBtns + '</td>' +
       '</tr>';
   }).join('');
 
@@ -3112,7 +3116,7 @@ function openExpiryNoticeModal(type) {
           '<table class="data-table">' +
             '<thead><tr>' +
               '<th>#</th><th>Customer</th><th>Phone</th><th>Status</th>' +
-              '<th>Days</th><th>Agent</th><th>Branch</th><th>Expiry Date</th>' +
+              '<th>Days</th><th>Agent</th><th>Branch</th><th>Expiry Date</th><th>Actions</th>' +
             '</tr></thead>' +
             '<tbody>' + tbodyHtml + '</tbody>' +
           '</table>' +
@@ -3122,6 +3126,51 @@ function openExpiryNoticeModal(type) {
     }
   }
   openModal('modal-expiry-notice');
+}
+
+function moveExpiryToActive(id) {
+  var item = topUpList.find(function(x) { return x.id === id; });
+  if (!item) { showAlert('Record not found.', 'error'); return; }
+  if (!canModifyRecord(item)) { showAlert('You do not have permission to edit this record.', 'error'); return; }
+  // Close the expiry notice modal first, then open the TopUp edit form
+  closeModal('modal-expiry-notice');
+  // Pre-fill the TopUp form with existing data so user can update the end date / renew
+  openCustomerModal('topup', item);
+}
+
+function moveExpiryToTerminate(id) {
+  var item = topUpList.find(function(x) { return x.id === id; });
+  if (!item) { showAlert('Record not found.', 'error'); return; }
+  if (!canModifyRecord(item)) { showAlert('You do not have permission to modify this record.', 'error'); return; }
+  showConfirm(
+    'Are you sure you want to terminate the service for ' + esc(item.name) + '? This will move the customer to the Terminate list.',
+    function() {
+      // Add to termination list if not already there
+      var existingTermRec = terminationList.find(function(t) {
+        return (item.customerId && t.customerId === item.customerId) || (t.name === item.name && t.phone === item.phone);
+      });
+      if (!existingTermRec) {
+        terminationList.push({
+          id: uid(), customerId: item.customerId || '', name: item.name, phone: item.phone,
+          reason: 'Service terminated (expired)',
+          agent: item.agent, branch: item.branch, date: todayStr(), lat: item.lat || '', lng: item.lng || ''
+        });
+        syncSheet('Terminations', terminationList);
+        renderTerminationTable();
+      }
+      // Remove from Top Up list
+      topUpList = topUpList.filter(function(x) { return x.id !== id; });
+      syncSheet('TopUp', topUpList);
+      saveAllData();
+      renderTopUpTable();
+      addNotification((currentUser ? currentUser.name : 'User') + ' terminated an expired customer (' + item.name + ').');
+      closeModal('modal-expiry-notice');
+      showToast('Customer terminated and moved to Terminate list.', 'info');
+    },
+    'Terminate Service',
+    'Terminate',
+    true
+  );
 }
 
 function submitTermination(e) {
