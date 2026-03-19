@@ -703,6 +703,24 @@ function todayStr() {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
+// Auto-calculate expiry date for Top Up: start date + period * 30 days.
+function calcTuExpiry() {
+  var dateEl = g('tu-date');
+  var periodEl = g('tu-period');
+  var endDateEl = g('tu-end-date');
+  if (!dateEl || !periodEl || !endDateEl) return;
+  var dateVal = dateEl.value;
+  var periodVal = parseInt(periodEl.value, 10);
+  if (!dateVal || !periodVal || periodVal < 1) return;
+  var parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateVal);
+  if (!parts) return;
+  var start = new Date(+parts[1], +parts[2] - 1, +parts[3]);
+  start.setDate(start.getDate() + periodVal * 30);
+  endDateEl.value = start.getFullYear() + '-' +
+    String(start.getMonth() + 1).padStart(2, '0') + '-' +
+    String(start.getDate()).padStart(2, '0');
+}
+
 function pctChange(curr, prev) {
   if (!prev) return null;
   return Math.round((curr - prev) / prev * 100);
