@@ -259,6 +259,9 @@ function readSheet(sheetName) {
 
 // Push all local data to Google Sheets. Exposed globally so admin can call it
 // from the browser console or a "Sync Up" button.
+// NOTE: Running Sync Up once will also cause ensureHeaders (in gas/Code.gs) to
+// create any missing columns (e.g. status, approvedBy, approvedAt) in the
+// Deposits sheet if they were absent from an older sheet setup.
 function syncUpAll() {
   if (!GS_URL) {
     showToast('No sync URL configured.', 'error');
@@ -3719,7 +3722,9 @@ function submitDeposit(e) {
     date: rv('dep-date'),
     submittedAt: (existingRecord && existingRecord.submittedAt) || new Date().toISOString(),
     remark: rv('dep-remark'),
-    status: editId ? (existingRecord || {}).status || 'pending' : 'pending'
+    status: editId ? (existingRecord || {}).status || 'pending' : 'pending',
+    approvedBy: editId ? (existingRecord || {}).approvedBy || '' : '',
+    approvedAt: editId ? (existingRecord || {}).approvedAt || '' : ''
   };
   if (!obj.agent) { showAlert('Please enter agent name'); return; }
   if (obj.amount <= 0 && riel <= 0) { showAlert('Please enter a cash, credit, and/or KHR riel amount greater than zero'); return; }
@@ -3774,10 +3779,31 @@ function approveDeposit(id) {
       depositList[idx].approvedAt = todayStr();
       renderDepositTable();
       updateDepositKpis();
-      syncSheet('Deposits', depositList);
       saveAllData();
-      showToast('Deposit approved.', 'success');
-      showApprovalFormModal('deposit', depositList[idx]);
+      // Show sync indicator
+      var ind = document.getElementById('gs-sync-indicator');
+      var lbl = document.getElementById('gs-sync-status');
+      if (ind) ind.className = 'syncing';
+      if (lbl) lbl.textContent = 'Syncing\u2026';
+      var approvedRecord = depositList[idx];
+      // Sync the full deposits array (same as syncSheet does) so all records
+      // including the newly approved one are written to the sheet together.
+      _gsPost({ sheet: 'Deposits', action: 'sync', data: normalizeArrayForSheet(depositList) })
+        .then(function() {
+          if (ind) ind.className = '';
+          if (lbl) lbl.textContent = 'Synced \u2713';
+          setTimeout(function() { if (lbl) lbl.textContent = ''; }, 3000);
+          showToast('Deposit approved.', 'success');
+        })
+        .catch(function(err) {
+          console.warn('GS sync error on approve:', err);
+          if (ind) ind.className = 'error';
+          if (lbl) lbl.textContent = 'Sync failed';
+          showToast('Deposit approved locally but failed to sync to Google Sheets. Please use Sync Up to push the data.', 'warning');
+        });
+      // Show the approval form modal immediately (before sync resolves) so the
+      // user sees confirmation regardless of sync outcome, as required.
+      showApprovalFormModal('deposit', approvedRecord);
     }
   }, 'Approve Deposit', 'Approve', false);
 }
