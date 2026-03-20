@@ -38,6 +38,8 @@ When a supervisor approves a deposit the record gains three fields: `status` (se
 The Apps Script automatically creates these columns in the *Deposits* sheet the first time a sync containing them is performed.  
 **If the Deposits sheet was created before these columns existed, run *Sync Up* once from the admin panel so the script can add the missing headers — after that, approval status will be saved and read back correctly.**
 
+As an additional safeguard, `syncDownAll()` in `app.js` now normalises every deposit record read back from the sheet: if the `status` field is absent (old sheet without the column), it defaults to `"pending"`; `approvedBy` and `approvedAt` default to empty strings. This prevents the app from silently treating already-approved deposits as pending when the sheet headers are stale. Records that already carry a `status` of `"approved"` are unaffected.
+
 ---
 
 ## How to deploy / redeploy the Apps Script Web App
