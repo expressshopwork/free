@@ -329,7 +329,17 @@ function syncDownAll() {
     { name: 'Terminations', lsKey: LS_KEYS.terminations, assign: function(d) { terminationList = d; } },
     { name: 'OutCoverage',  lsKey: LS_KEYS.outCoverage,  assign: function(d) { outCoverageList = d; } },
     { name: 'Promotions',   lsKey: LS_KEYS.promotions,   assign: function(d) { promotionList = d; } },
-    { name: 'Deposits',     lsKey: LS_KEYS.deposits,     assign: function(d) { depositList = d; } },
+    { name: 'Deposits',     lsKey: LS_KEYS.deposits,     assign: function(d) {
+        depositList = d.map(function(r) {
+          // Safeguard: if the Deposits sheet is missing the status/approvedBy/approvedAt
+          // columns (sheet created before those columns were added), default them so
+          // the app never silently loses approval state after a Sync Down.
+          if (r.status == null) r.status = 'pending';
+          if (r.approvedBy == null) r.approvedBy = '';
+          if (r.approvedAt == null) r.approvedAt = '';
+          return r;
+        });
+    }},
     { name: 'KPI',          lsKey: LS_KEYS.kpis,         assign: function(d) { kpiList = d; } },
     { name: 'Items',        lsKey: LS_KEYS.items,        assign: function(d) { if (d.length) itemCatalogue = d; } },
     { name: 'Coverage',     lsKey: LS_KEYS.coverage,     assign: function(d) { coverageLocations = d; } },
