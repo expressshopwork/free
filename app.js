@@ -3830,6 +3830,11 @@ function approveDeposit(id) {
   }, 'Approve Deposit', 'Approve', false);
 }
 
+function viewDepositRevenue(id) {
+  var record = depositList.find(function(x) { return x.id === id; });
+  if (record) showApprovalFormModal('deposit', record);
+}
+
 function updateDepositKpis() {
   const baseDeposits = getBaseRecordsForRole(depositList);
   let totalCash = 0, totalCredit = 0, totalRiel = 0;
@@ -3934,6 +3939,7 @@ function renderDepositTable() {
     const statusPill = status === 'approved' ? 'pill-green' : 'pill-orange';
     const statusLabel = status === 'approved' ? 'Approved' : 'Pending';
     const approveBtn = (canApprove && status !== 'approved') ? '<button class="btn-edit" onclick="approveDeposit(\'' + esc(d.id) + '\')" title="Approve"><i class="fas fa-check-circle"></i></button> ' : '';
+    const viewBtn = (status === 'approved') ? '<button class="btn-edit" onclick="viewDepositRevenue(\'' + esc(d.id) + '\')" title="View Revenue Detail" style="color:#1565C0;"><i class="fas fa-eye"></i></button> ' : '';
     // Approved records may only be edited/deleted by admin
     const canEdit = canModifyRecord(d) && (status !== 'approved' || currentRole === 'admin');
     var dCreditAmt = _depCreditAmt(d);
@@ -3950,6 +3956,7 @@ function renderDepositTable() {
       '<td><span class="pill ' + statusPill + '">' + statusLabel + '</span></td>' +
       '<td style="white-space:nowrap;">' +
         approveBtn +
+        viewBtn +
         (canEdit ? '<button class="btn-edit" onclick="editDeposit(\'' + esc(d.id) + '\')"><i class="fas fa-edit"></i></button> ' : '') +
         (canEdit ? '<button class="btn-delete" onclick="deleteDeposit(\'' + esc(d.id) + '\')"><i class="fas fa-trash"></i></button>' : '') +
       '</td>' +
@@ -5210,13 +5217,18 @@ function showApprovalFormModal(type, data) {
 
   var detailRows = '';
   if (v.isDeposit) {
+    var dCreditAmt = _depCreditAmt(data);
+    var totalAmt = (Number(data.cash) || 0) + khrToUsd(data.riel || 0) + dCreditAmt;
     detailRows =
-      '<tr><td style="padding:7px 12px;font-weight:600;color:#555;background:#f5f7fa;border-bottom:1px solid #eee;width:45%;">Cash Amount</td>' +
-        '<td style="padding:7px 12px;border-bottom:1px solid #eee;font-weight:700;color:#1B7D3D;">$' + (data.cash ? Number(data.cash).toFixed(2) : '0.00') + '</td></tr>' +
-      '<tr><td style="padding:7px 12px;font-weight:600;color:#555;background:#f5f7fa;border-bottom:1px solid #eee;">Credit Amount</td>' +
-        '<td style="padding:7px 12px;border-bottom:1px solid #eee;font-weight:700;color:#1565C0;">$' + (_depCreditAmt(data) ? Number(_depCreditAmt(data)).toFixed(2) : '0.00') + '</td></tr>' +
-      '<tr><td style="padding:7px 12px;font-weight:600;color:#555;background:#f5f7fa;border-bottom:1px solid #eee;">Total Amount</td>' +
-        '<td style="padding:7px 12px;border-bottom:1px solid #eee;font-weight:700;color:#E65100;">$' + ((Number(data.cash)||0) + _depCreditAmt(data)).toFixed(2) + '</td></tr>';
+      '<tr><td colspan="2" style="padding:6px 12px;background:#e8f5e9;font-weight:700;font-size:.78rem;color:#1B7D3D;letter-spacing:.6px;border-bottom:1px solid #c8e6c9;text-transform:uppercase;">Revenue Detail</td></tr>' +
+      '<tr><td style="padding:8px 12px;font-weight:600;color:#555;background:#f5f7fa;border-bottom:1px solid #eee;width:45%;">Cash ($)</td>' +
+        '<td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:700;color:#1B7D3D;">$' + Number(data.cash || 0).toFixed(2) + '</td></tr>' +
+      '<tr><td style="padding:8px 12px;font-weight:600;color:#555;background:#f5f7fa;border-bottom:1px solid #eee;">Cash KHR (៛)</td>' +
+        '<td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:700;color:#8B6914;">' + formatKHR(data.riel || 0) + '</td></tr>' +
+      '<tr><td style="padding:8px 12px;font-weight:600;color:#555;background:#f5f7fa;border-bottom:1px solid #eee;">Credit ($)</td>' +
+        '<td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:700;color:#1565C0;">$' + Number(dCreditAmt || 0).toFixed(2) + '</td></tr>' +
+      '<tr><td style="padding:8px 12px;font-weight:700;color:#fff;background:#1B7D3D;border-bottom:1px solid #4caf50;">Total Amount</td>' +
+        '<td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:800;color:#E65100;font-size:1.05rem;">$' + totalAmt.toFixed(2) + '</td></tr>';
   } else {
     detailRows =
       '<tr><td style="padding:7px 12px;font-weight:600;color:#555;background:#f5f7fa;border-bottom:1px solid #eee;width:45%;">Item Name</td>' +
@@ -5229,23 +5241,26 @@ function showApprovalFormModal(type, data) {
 
   if (contentEl) {
     contentEl.innerHTML =
-      '<div style="border:2px solid #1B7D3D;border-radius:8px;overflow:hidden;">' +
-        '<div style="background:#1B7D3D;color:#fff;padding:12px 16px;text-align:center;">' +
-          '<div style="font-size:1.1rem;font-weight:700;letter-spacing:.5px;">SMART 5G DASHBOARD</div>' +
-          '<div style="font-size:.85rem;opacity:.9;margin-top:2px;">' + v.formTitle.toUpperCase() + '</div>' +
+      '<div style="border:2px solid #1B7D3D;border-radius:10px;overflow:hidden;box-shadow:0 2px 12px rgba(27,125,61,.10);">' +
+        '<div style="background:linear-gradient(135deg,#1B7D3D 0%,#2e9d58 100%);color:#fff;padding:16px 20px;text-align:center;">' +
+          '<div style="font-size:1.15rem;font-weight:800;letter-spacing:.8px;text-transform:uppercase;">SMART 5G DASHBOARD</div>' +
+          '<div style="font-size:.85rem;opacity:.9;margin-top:4px;font-weight:500;">' + v.formTitle.toUpperCase() + '</div>' +
+          (v.isDeposit ? '<div style="margin-top:8px;"><span style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);border-radius:20px;padding:3px 14px;font-size:.78rem;font-weight:700;letter-spacing:.5px;">✓ APPROVED</span></div>' : '') +
         '</div>' +
         '<table style="width:100%;border-collapse:collapse;">' +
-          '<tr><td style="padding:7px 12px;font-weight:600;color:#555;background:#f5f7fa;border-bottom:1px solid #eee;width:45%;">Submitter Name</td>' +
-            '<td style="padding:7px 12px;border-bottom:1px solid #eee;font-weight:600;">' + esc(v.submitter) + '</td></tr>' +
-          (v.branch ? '<tr><td style="padding:7px 12px;font-weight:600;color:#555;background:#f5f7fa;border-bottom:1px solid #eee;">Branch</td><td style="padding:7px 12px;border-bottom:1px solid #eee;">' + esc(v.branch) + '</td></tr>' : '') +
-          '<tr><td style="padding:7px 12px;font-weight:600;color:#555;background:#f5f7fa;border-bottom:1px solid #eee;">Date Submitted</td>' +
-            '<td style="padding:7px 12px;border-bottom:1px solid #eee;">' + esc(v.dateSubmitted) + '</td></tr>' +
+          '<tr><td colspan="2" style="padding:6px 12px;background:#f0f4f8;font-weight:700;font-size:.78rem;color:#555;letter-spacing:.6px;border-bottom:1px solid #dde3ea;text-transform:uppercase;">Submission Info</td></tr>' +
+          '<tr><td style="padding:8px 12px;font-weight:600;color:#555;background:#f5f7fa;border-bottom:1px solid #eee;width:45%;">Submitter Name</td>' +
+            '<td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:600;">' + esc(v.submitter) + '</td></tr>' +
+          (v.branch ? '<tr><td style="padding:8px 12px;font-weight:600;color:#555;background:#f5f7fa;border-bottom:1px solid #eee;">Branch</td><td style="padding:8px 12px;border-bottom:1px solid #eee;">' + esc(v.branch) + '</td></tr>' : '') +
+          '<tr><td style="padding:8px 12px;font-weight:600;color:#555;background:#f5f7fa;border-bottom:1px solid #eee;">Date Submitted</td>' +
+            '<td style="padding:8px 12px;border-bottom:1px solid #eee;">' + esc(v.dateSubmitted) + '</td></tr>' +
           detailRows +
-          (v.remark ? '<tr><td style="padding:7px 12px;font-weight:600;color:#555;background:#f5f7fa;border-bottom:1px solid #eee;">Remark / Note</td><td style="padding:7px 12px;border-bottom:1px solid #eee;">' + esc(v.remark) + '</td></tr>' : '') +
-          '<tr><td style="padding:7px 12px;font-weight:600;color:#555;background:#f5f7fa;border-bottom:1px solid #eee;">Approved By</td>' +
-            '<td style="padding:7px 12px;border-bottom:1px solid #eee;font-weight:600;color:#1B7D3D;">' + esc(v.approver) + '</td></tr>' +
-          '<tr><td style="padding:7px 12px;font-weight:600;color:#555;background:#f5f7fa;">Date Approved</td>' +
-            '<td style="padding:7px 12px;font-weight:600;">' + esc(v.dateApproved) + '</td></tr>' +
+          (v.remark ? '<tr><td style="padding:8px 12px;font-weight:600;color:#555;background:#f5f7fa;border-bottom:1px solid #eee;">Remark / Note</td><td style="padding:8px 12px;border-bottom:1px solid #eee;font-style:italic;color:#666;">' + esc(v.remark) + '</td></tr>' : '') +
+          '<tr><td colspan="2" style="padding:6px 12px;background:#f0f4f8;font-weight:700;font-size:.78rem;color:#555;letter-spacing:.6px;border-bottom:1px solid #dde3ea;border-top:1px solid #dde3ea;text-transform:uppercase;">Approval Info</td></tr>' +
+          '<tr><td style="padding:8px 12px;font-weight:600;color:#555;background:#f5f7fa;border-bottom:1px solid #eee;">Approved By</td>' +
+            '<td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:700;color:#1B7D3D;">' + esc(v.approver) + '</td></tr>' +
+          '<tr><td style="padding:8px 12px;font-weight:600;color:#555;background:#f5f7fa;">Date Approved</td>' +
+            '<td style="padding:8px 12px;font-weight:600;color:#333;">' + esc(v.dateApproved) + '</td></tr>' +
         '</table>' +
       '</div>';
   }
@@ -5269,7 +5284,7 @@ function _getApprovalFormVars(type, data) {
   var isDeposit = (type === 'deposit');
   return {
     isDeposit: isDeposit,
-    formTitle: isDeposit ? 'Daily Cash & Credit Deposit Approval' : 'Stock Allocation Approval',
+    formTitle: isDeposit ? 'Revenue Deposit Approval' : 'Stock Allocation Approval',
     submitter: isDeposit ? (data.agent || '') : (data.requestedBy || ''),
     approver:  isDeposit ? (data.approvedBy || '') : (data.reviewedBy || ''),
     dateSubmitted: isDeposit ? toLocalDateStr(data.date || (data.submittedAt ? data.submittedAt.split('T')[0] : '')) : (data.date || ''),
@@ -5287,10 +5302,14 @@ function printApprovalForm() {
 
   var detailHtml = '';
   if (v.isDeposit) {
+    var dCreditAmtP = _depCreditAmt(data);
+    var totalAmtP = (Number(data.cash) || 0) + khrToUsd(data.riel || 0) + dCreditAmtP;
     detailHtml =
-      '<tr><td class="lbl">Cash Amount</td><td class="val" style="color:#1B7D3D;">$' + (data.cash ? Number(data.cash).toFixed(2) : '0.00') + '</td></tr>' +
-      '<tr><td class="lbl">Credit Amount</td><td class="val" style="color:#1565C0;">$' + (_depCreditAmt(data) ? Number(_depCreditAmt(data)).toFixed(2) : '0.00') + '</td></tr>' +
-      '<tr><td class="lbl">Total Amount</td><td class="val" style="font-weight:700;color:#E65100;">$' + ((Number(data.cash)||0) + _depCreditAmt(data)).toFixed(2) + '</td></tr>';
+      '<tr><td colspan="2" class="lbl" style="background:#e8f5e9;color:#1B7D3D;font-size:.78rem;letter-spacing:.5px;text-transform:uppercase;">Revenue Detail</td></tr>' +
+      '<tr><td class="lbl">Cash ($)</td><td class="val" style="color:#1B7D3D;">$' + Number(data.cash || 0).toFixed(2) + '</td></tr>' +
+      '<tr><td class="lbl">Cash KHR (&#x17DB;)</td><td class="val" style="color:#8B6914;">' + formatKHR(data.riel || 0) + '</td></tr>' +
+      '<tr><td class="lbl">Credit ($)</td><td class="val" style="color:#1565C0;">$' + Number(dCreditAmtP || 0).toFixed(2) + '</td></tr>' +
+      '<tr><td class="lbl" style="background:#1B7D3D;color:#fff;font-weight:700;">Total Amount</td><td class="val" style="font-weight:800;color:#E65100;font-size:1.05rem;">$' + totalAmtP.toFixed(2) + '</td></tr>';
   } else {
     detailHtml =
       '<tr><td class="lbl">Item Name</td><td class="val">' + _escHtml(data.itemName) + '</td></tr>' +
@@ -5300,13 +5319,15 @@ function printApprovalForm() {
 
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + _escHtml(v.formTitle) + '</title><style>' +
     'body{font-family:Arial,sans-serif;padding:32px;color:#1A1A2E;font-size:13px;max-width:700px;margin:0 auto;}' +
-    '.header{background:#1B7D3D;color:#fff;padding:14px 20px;border-radius:8px 8px 0 0;text-align:center;}' +
-    '.header h1{margin:0;font-size:1.1rem;letter-spacing:.5px;}' +
-    '.header p{margin:3px 0 0;font-size:.8rem;opacity:.9;}' +
+    '.header{background:linear-gradient(135deg,#1B7D3D 0%,#2e9d58 100%);color:#fff;padding:18px 20px;border-radius:8px 8px 0 0;text-align:center;}' +
+    '.header h1{margin:0;font-size:1.15rem;font-weight:800;letter-spacing:.8px;text-transform:uppercase;}' +
+    '.header p{margin:4px 0 0;font-size:.8rem;opacity:.9;font-weight:500;}' +
+    '.status-badge{display:inline-block;margin-top:10px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);border-radius:20px;padding:3px 14px;font-size:.78rem;font-weight:700;letter-spacing:.5px;}' +
     'table{width:100%;border-collapse:collapse;border:2px solid #1B7D3D;border-top:none;border-radius:0 0 8px 8px;overflow:hidden;}' +
-    'td{padding:8px 14px;border-bottom:1px solid #e8e8e8;}' +
+    'td{padding:9px 14px;border-bottom:1px solid #e8e8e8;}' +
     '.lbl{background:#f5f7fa;font-weight:600;color:#555;width:45%;}' +
     '.val{font-weight:500;}' +
+    '.section-hdr td{background:#f0f4f8;font-weight:700;font-size:.78rem;color:#555;letter-spacing:.6px;text-transform:uppercase;padding:6px 14px;border-bottom:1px solid #dde3ea;}' +
     '.sig-section{display:flex;gap:32px;margin-top:28px;}' +
     '.sig-box{flex:1;}' +
     '.sig-box p{font-weight:600;font-size:.85rem;color:#555;margin:0 0 6px;}' +
@@ -5319,15 +5340,19 @@ function printApprovalForm() {
     '<div class="no-print" style="margin-bottom:16px;text-align:right;">' +
       '<button onclick="window.print()" style="background:#1B7D3D;color:#fff;border:none;padding:9px 18px;border-radius:6px;cursor:pointer;font-size:.875rem;">\uD83D\uDDB6 Print / Save as PDF</button>' +
     '</div>' +
-    '<div class="header"><h1>SMART 5G DASHBOARD</h1><p>' + _escHtml(v.formTitle).toUpperCase() + '</p></div>' +
+    '<div class="header"><h1>SMART 5G DASHBOARD</h1><p>' + _escHtml(v.formTitle).toUpperCase() + '</p>' +
+      (v.isDeposit ? '<div class="status-badge">\u2713 APPROVED</div>' : '') +
+    '</div>' +
     '<table>' +
+      '<tr class="section-hdr"><td colspan="2">Submission Info</td></tr>' +
       '<tr><td class="lbl">Submitter Name</td><td class="val">' + _escHtml(v.submitter) + '</td></tr>' +
       (v.branch ? '<tr><td class="lbl">Branch</td><td class="val">' + _escHtml(v.branch) + '</td></tr>' : '') +
       '<tr><td class="lbl">Date Submitted</td><td class="val">' + _escHtml(v.dateSubmitted) + '</td></tr>' +
       detailHtml +
-      (v.remark ? '<tr><td class="lbl">Remark / Note</td><td class="val">' + _escHtml(v.remark) + '</td></tr>' : '') +
-      '<tr><td class="lbl">Approved By</td><td class="val" style="color:#1B7D3D;font-weight:600;">' + _escHtml(v.approver) + '</td></tr>' +
-      '<tr><td class="lbl">Date Approved</td><td class="val">' + _escHtml(v.dateApproved) + '</td></tr>' +
+      (v.remark ? '<tr><td class="lbl">Remark / Note</td><td class="val" style="font-style:italic;color:#666;">' + _escHtml(v.remark) + '</td></tr>' : '') +
+      '<tr class="section-hdr"><td colspan="2">Approval Info</td></tr>' +
+      '<tr><td class="lbl">Approved By</td><td class="val" style="color:#1B7D3D;font-weight:700;">' + _escHtml(v.approver) + '</td></tr>' +
+      '<tr><td class="lbl">Date Approved</td><td class="val" style="font-weight:600;">' + _escHtml(v.dateApproved) + '</td></tr>' +
     '</table>' +
     '<div class="sig-section">' +
       '<div class="sig-box"><p>Submitter Signature:</p><div class="sig-line"></div><div class="sig-name">' + _escHtml(v.submitter) + '</div></div>' +
@@ -5372,9 +5397,13 @@ function emailApprovalForm() {
   bodyLines.push('Date Submitted  : ' + v.dateSubmitted);
 
   if (v.isDeposit) {
-    bodyLines.push('Cash Amount     : $' + (data.cash ? Number(data.cash).toFixed(2) : '0.00'));
-    bodyLines.push('Credit Amount   : $' + (_depCreditAmt(data) ? Number(_depCreditAmt(data)).toFixed(2) : '0.00'));
-    bodyLines.push('Total Amount    : $' + ((Number(data.cash)||0) + _depCreditAmt(data)).toFixed(2));
+    var dCreditAmtE = _depCreditAmt(data);
+    var totalAmtE = (Number(data.cash) || 0) + khrToUsd(data.riel || 0) + dCreditAmtE;
+    bodyLines.push('--- Revenue Detail ---');
+    bodyLines.push('Cash ($)        : $' + Number(data.cash || 0).toFixed(2));
+    bodyLines.push('Cash KHR (\u17DB)   : ' + formatKHR(data.riel || 0));
+    bodyLines.push('Credit ($)      : $' + Number(dCreditAmtE || 0).toFixed(2));
+    bodyLines.push('Total Amount    : $' + totalAmtE.toFixed(2));
   } else {
     bodyLines.push('Item Name       : ' + (data.itemName || ''));
     bodyLines.push('Quantity        : ' + (data.qty || 0));
