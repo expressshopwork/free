@@ -329,7 +329,7 @@ function syncDownAll() {
     { name: 'Terminations', lsKey: LS_KEYS.terminations, assign: function(d) { terminationList = d; } },
     { name: 'OutCoverage',  lsKey: LS_KEYS.outCoverage,  assign: function(d) { outCoverageList = d; } },
     { name: 'Promotions',   lsKey: LS_KEYS.promotions,   assign: function(d) { promotionList = d; } },
-    { name: 'Deposits',     lsKey: LS_KEYS.deposits,     assign: function(d) { depositList = d; } },
+    { name: 'Deposits',     lsKey: LS_KEYS.deposits,     assign: function(d) { depositList = d.map(normalizeDeposit); } },
     { name: 'KPI',          lsKey: LS_KEYS.kpis,         assign: function(d) { kpiList = d; } },
     { name: 'Items',        lsKey: LS_KEYS.items,        assign: function(d) { if (d.length) itemCatalogue = d; } },
     { name: 'Coverage',     lsKey: LS_KEYS.coverage,     assign: function(d) { coverageLocations = d; } },
@@ -546,7 +546,7 @@ function loadAllData() {
   staffList = lsLoad(LS_KEYS.staff, staffList);
   kpiList = lsLoad(LS_KEYS.kpis, kpiList);
   promotionList = lsLoad(LS_KEYS.promotions, promotionList);
-  depositList = lsLoad(LS_KEYS.deposits, depositList);
+  depositList = lsLoad(LS_KEYS.deposits, depositList).map(normalizeDeposit);
   coverageLocations = lsLoad(LS_KEYS.coverage, coverageLocations);
   // Ensure admin user always exists
   var hasAdmin = staffList.some(function(u) { return u.username === 'admin' && u.role === 'Admin'; });
@@ -3603,6 +3603,28 @@ function _resetDenomSection() {
 // `creditAmount` field and the legacy `credit` field for backward compatibility.
 function _depCreditAmt(deposit) {
   return deposit.creditAmount !== undefined ? deposit.creditAmount : (deposit.credit || 0);
+}
+
+// Normalizes a deposit record to ensure all required numeric fields are present.
+// Back-fills the `cash` field for legacy records loaded from Google Sheets or
+// localStorage that were created before the cash column existed.
+function normalizeDeposit(d) {
+  if (!d || typeof d !== 'object') {
+    console.warn('normalizeDeposit: received non-object value', d);
+    return d;
+  }
+  var out = Object.assign({}, d);
+  // Ensure cash is a number; infer from total when missing or empty string
+  if (out.cash === undefined || out.cash === '' || out.cash === null) {
+    var creditAmt = out.creditAmount !== undefined ? (parseFloat(out.creditAmount) || 0) : (parseFloat(out.credit) || 0);
+    var rielAmt   = parseFloat(out.riel) || 0;
+    var totalAmt  = parseFloat(out.amount) || 0;
+    var rielInUsd = parseFloat(khrToUsd(rielAmt)) || 0;
+    out.cash = Math.max(0, totalAmt - creditAmt - rielInUsd);
+  } else {
+    out.cash = parseFloat(out.cash) || 0;
+  }
+  return out;
 }
 
 function _loadDenomSection(cashDetail) {
