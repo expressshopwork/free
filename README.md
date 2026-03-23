@@ -38,6 +38,12 @@ When a supervisor approves a deposit the record gains three fields: `status` (se
 The Apps Script automatically creates these columns in the *Deposits* sheet the first time a sync containing them is performed.  
 **If the Deposits sheet was created before these columns existed, run *Sync Up* once from the admin panel so the script can add the missing headers — after that, approval status will be saved and read back correctly.**
 
+### Deposits — `cash` column (Cash $)
+
+The `cash` column stores the USD cash amount for each deposit record.  
+If the Deposits sheet is missing this column (e.g. it was created before the cash field was introduced), the app automatically back-fills the value from the deposit total when loading records, and the column will be created in the sheet the next time *Sync Up* is run.  
+**No manual sheet editing is required — run *Sync Up* once from the admin panel to add the missing `cash` column.**
+
 ---
 
 ## How to deploy / redeploy the Apps Script Web App
