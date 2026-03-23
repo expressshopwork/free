@@ -3559,7 +3559,7 @@ function calcDenomTotals() {
   if (usdHeaderEl) usdHeaderEl.textContent = '$' + usdTotal.toFixed(2);
   var usdRowEl = g('usd-denom-total-row');
   if (usdRowEl) usdRowEl.textContent = '$' + usdTotal.toFixed(2);
-  var cashEl = g('dep-cash'); if (cashEl) cashEl.value = usdTotal > 0 ? usdTotal.toFixed(2) : '';
+  var cashEl = g('dep-cash'); if (cashEl && usdTotal > 0) cashEl.value = usdTotal.toFixed(2);
 
   var khrTotal = 0;
   KHR_DENOMS.forEach(function(d) {
@@ -3577,7 +3577,7 @@ function calcDenomTotals() {
   if (khrHeaderEl) khrHeaderEl.textContent = formatKHR(khrTotal);
   var khrRowEl = g('khr-denom-total-row');
   if (khrRowEl) khrRowEl.textContent = formatKHR(khrTotal);
-  var rielEl = g('dep-riel'); if (rielEl) rielEl.value = khrTotal > 0 ? khrTotal : '';
+  var rielEl = g('dep-riel'); if (rielEl && khrTotal > 0) rielEl.value = khrTotal;
 }
 
 function _resetDenomSection() {
