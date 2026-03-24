@@ -35,8 +35,11 @@ The Apps Script (`gas/Code.gs`) automatically adds the `endDate` column if it is
 ### Deposits — approval columns (`status`, `approvedBy`, `approvedAt`)
 
 When a supervisor approves a deposit the record gains three fields: `status` (set to `"approved"`), `approvedBy`, and `approvedAt`.  
-The Apps Script automatically creates these columns in the *Deposits* sheet the first time a sync containing them is performed.  
-**If the Deposits sheet was created before these columns existed, run *Sync Up* once from the admin panel so the script can add the missing headers — after that, approval status will be saved and read back correctly.**
+The Apps Script automatically creates these columns in the *Deposits* sheet the first time a sync containing them is performed.
+
+**Status column is always written.** All deposit records — including legacy ones loaded from earlier versions of the sheet — are normalised in the app so that `status` defaults to `"pending"`, `approvedBy` defaults to `""`, and `approvedAt` defaults to `""`. This guarantees the three columns are always populated in Google Sheets after the next sync.
+
+**Targeted status updates.** When a deposit is approved, the app uses the `updateRow` GAS action to update **only** the `status`, `approvedBy`, and `approvedAt` columns of the matching row, without touching any other data in the sheet.  If the targeted update fails (e.g. the sheet row cannot be found), the app automatically falls back to a full sync so the change is never silently lost.
 
 ### Deposits — `cash` column (Cash $)
 
@@ -75,10 +78,12 @@ The web app communicates with the GAS Web App via `POST` requests:
 
 Supported `action` values:
 
-| Action   | Description                                    |
-|----------|------------------------------------------------|
-| `sync`   | Replace all rows in the sheet with `data`      |
-| `read`   | Return all rows as a JSON array of objects     |
-| `delete` | Delete the row whose `id` matches `data.id`    |
+| Action      | Description                                                           |
+|-------------|-----------------------------------------------------------------------|
+| `sync`      | Replace all rows in the sheet with `data`                             |
+| `read`      | Return all rows as a JSON array of objects                            |
+| `delete`    | Delete the row whose `id` matches `data.id`                           |
+| `append`    | Append a single record row                                            |
+| `updateRow` | Update specific fields of the row whose `id` matches `data.id`; only the keys present in `data` are written, all other columns are left untouched |
 
 The Apps Script automatically creates missing sheets and adds new header columns on the first sync, so it is **backward-compatible** with existing spreadsheet data.
