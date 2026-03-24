@@ -78,12 +78,14 @@ const SUPPORT_CONTACT = { email: 'support@smart5g.com', phone: '+855 23 123 456'
 const GS_URL = 'https://script.google.com/macros/s/AKfycbwv8kdASEnPxjQJ8-wvnIZ5_Ib7_suDDcYU46VPNeVE0WKJboAYQlq3TqrA1QsXu0Y/exec';
 
 function _gsPost(payload, retries) {
-  if (!GS_URL) return Promise.resolve();
+  if (!GS_URL) return Promise.resolve({});
   retries = retries === undefined ? 2 : retries;
   return fetch(GS_URL, {
     method: 'POST',
     body: JSON.stringify(payload)
-  }).catch(function(err) {
+  })
+  .then(function(resp) { return resp.json(); })
+  .catch(function(err) {
     if (retries > 0) {
       return new Promise(function(resolve) { setTimeout(resolve, 1500); })
         .then(function() { return _gsPost(payload, retries - 1); });
@@ -3605,9 +3607,11 @@ function _depCreditAmt(deposit) {
   return deposit.creditAmount !== undefined ? deposit.creditAmount : (deposit.credit || 0);
 }
 
-// Normalizes a deposit record to ensure all required numeric fields are present.
+// Normalizes a deposit record to ensure all required fields are present.
 // Back-fills the `cash` field for legacy records loaded from Google Sheets or
 // localStorage that were created before the cash column existed.
+// Also ensures the status-related fields have sensible defaults so that legacy
+// records without these columns still display and sync correctly.
 function normalizeDeposit(d) {
   if (!d || typeof d !== 'object') {
     console.warn('normalizeDeposit: received non-object value', d);
@@ -3624,6 +3628,11 @@ function normalizeDeposit(d) {
   } else {
     out.cash = parseFloat(out.cash) || 0;
   }
+  // Ensure status-related fields are present so legacy records without these
+  // columns are handled consistently and synced with correct values to the sheet.
+  if (out.status === undefined || out.status === null || out.status === '') out.status = 'pending';
+  if (out.approvedBy === undefined || out.approvedBy === null) out.approvedBy = '';
+  if (out.approvedAt === undefined || out.approvedAt === null) out.approvedAt = '';
   return out;
 }
 
@@ -3808,20 +3817,44 @@ function approveDeposit(id) {
       if (ind) ind.className = 'syncing';
       if (lbl) lbl.textContent = 'Syncing\u2026';
       var approvedRecord = depositList[idx];
-      // Sync the full deposits array (same as syncSheet does) so all records
-      // including the newly approved one are written to the sheet together.
-      _gsPost({ sheet: 'Deposits', action: 'sync', data: normalizeArrayForSheet(depositList) })
-        .then(function() {
+      // Use a targeted updateRow to write only the three status-related fields so
+      // that other concurrent changes are not overwritten.  Fall back to a full
+      // sync if the targeted update fails (e.g. sheet does not yet have the row).
+      var statusPatch = {
+        id:         approvedRecord.id,
+        status:     approvedRecord.status,
+        approvedBy: approvedRecord.approvedBy,
+        approvedAt: approvedRecord.approvedAt
+      };
+      var doFullSync = function(reason) {
+        console.warn('GS updateRow failed (' + reason + '), falling back to full sync.');
+        return _gsPost({ sheet: 'Deposits', action: 'sync', data: normalizeArrayForSheet(depositList) })
+          .then(function() {
+            if (ind) ind.className = '';
+            if (lbl) lbl.textContent = 'Synced \u2713';
+            setTimeout(function() { if (lbl) lbl.textContent = ''; }, 3000);
+            showToast('Deposit approved.', 'success');
+          })
+          .catch(function(syncErr) {
+            console.warn('GS sync error on approve:', syncErr);
+            if (ind) ind.className = 'error';
+            if (lbl) lbl.textContent = 'Sync failed';
+            showToast('Deposit approved locally but failed to sync to Google Sheets. Please use Sync Up to push the data.', 'warning');
+          });
+      };
+      _gsPost({ sheet: 'Deposits', action: 'updateRow', data: statusPatch })
+        .then(function(resp) {
+          // _gsPost resolves even for GAS-level errors; check the returned status.
+          if (resp && resp.status === 'error') {
+            return doFullSync(resp.message || 'GAS returned error');
+          }
           if (ind) ind.className = '';
           if (lbl) lbl.textContent = 'Synced \u2713';
           setTimeout(function() { if (lbl) lbl.textContent = ''; }, 3000);
           showToast('Deposit approved.', 'success');
         })
         .catch(function(err) {
-          console.warn('GS sync error on approve:', err);
-          if (ind) ind.className = 'error';
-          if (lbl) lbl.textContent = 'Sync failed';
-          showToast('Deposit approved locally but failed to sync to Google Sheets. Please use Sync Up to push the data.', 'warning');
+          return doFullSync(err);
         });
       // Show the approval form modal immediately (before sync resolves) so the
       // user sees confirmation regardless of sync outcome, as required.

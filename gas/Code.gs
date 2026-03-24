@@ -32,10 +32,11 @@ function doPost(e) {
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-    if (action === 'sync')   return syncSheetData(ss, sheetName, data);
-    if (action === 'read')   return readSheetData(ss, sheetName);
-    if (action === 'delete') return deleteRow(ss, sheetName, data ? data.id : null);
-    if (action === 'append') return appendRow(ss, sheetName, data);
+    if (action === 'sync')      return syncSheetData(ss, sheetName, data);
+    if (action === 'read')      return readSheetData(ss, sheetName);
+    if (action === 'delete')    return deleteRow(ss, sheetName, data ? data.id : null);
+    if (action === 'append')    return appendRow(ss, sheetName, data);
+    if (action === 'updateRow') return updateRow(ss, sheetName, data);
 
     return jsonResponse({ status: 'error', message: 'Unknown action: ' + action });
   } catch (err) {
@@ -234,4 +235,46 @@ function appendRow(ss, sheetName, data) {
   sheet.appendRow(row);
 
   return jsonResponse({ status: 'ok' });
+}
+
+/**
+ * updateRow – Update specific fields of the row whose 'id' column matches data.id.
+ * Only the keys present in data (other than 'id') are written; all other columns
+ * are left untouched.  New columns referenced in data are auto-created as needed.
+ *
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss
+ * @param {string} sheetName
+ * @param {Object} data - Must contain 'id' plus whichever fields to update.
+ */
+function updateRow(ss, sheetName, data) {
+  if (!data || !data.id) return jsonResponse({ status: 'error', message: 'No id provided.' });
+
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) return jsonResponse({ status: 'error', message: 'Sheet not found: ' + sheetName });
+
+  // Ensure any new columns referenced in data exist in the header row
+  var headers = ensureHeaders(sheet, data);
+  var idColIdx = headers.indexOf('id');
+  if (idColIdx < 0) return jsonResponse({ status: 'error', message: 'No "id" column in sheet.' });
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return jsonResponse({ status: 'error', message: 'No data rows in sheet.' });
+
+  var idValues = sheet.getRange(2, idColIdx + 1, lastRow - 1, 1).getValues();
+  for (var i = 0; i < idValues.length; i++) {
+    if (String(idValues[i][0]) === String(data.id)) {
+      var rowNumber = i + 2; // +2: 1-based index + header row offset
+      // Update only the columns present in data (skip 'id')
+      Object.keys(data).forEach(function(k) {
+        if (k === 'id') return;
+        var colIdx = headers.indexOf(k);
+        if (colIdx >= 0) {
+          sheet.getRange(rowNumber, colIdx + 1).setValue(toSheetValue(data[k]));
+        }
+      });
+      return jsonResponse({ status: 'ok' });
+    }
+  }
+
+  return jsonResponse({ status: 'error', message: 'Row not found: ' + data.id });
 }
