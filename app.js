@@ -4357,9 +4357,9 @@ function setValueMode(mode) {
 function populateKpiItemSel() {
   const sel = g('kpi-item-sel');
   if (!sel) return;
-  const unitItems = itemCatalogue.filter(function(x) { return x.group === 'unit' && x.status === 'active'; });
-  sel.innerHTML = '<option value="">All Unit Items</option>' +
-    unitItems.map(function(item) {
+  const allItems = itemCatalogue.filter(function(x) { return x.status === 'active' && x.id !== ITEM_ID_REVENUE; });
+  sel.innerHTML = '<option value="">All Items</option>' +
+    allItems.map(function(item) {
       return '<option value="' + esc(item.id) + '">' + esc(item.name) + '</option>';
     }).join('');
 }
@@ -6057,7 +6057,10 @@ function populateStKpiSel() {
   var cur = sel.value;
   sel.innerHTML = '<option value="">— Select KPI —</option>' +
     kpis.map(function(k) {
-      var lbl = k.name + ' (' + k.target + ' ' + esc(getKpiUnitLabel(k) || 'units') + '/month)';
+      var itemLabel = getKpiUnitLabel(k);
+      var lbl = itemLabel
+        ? (esc(itemLabel) + ' — ' + esc(k.name) + ' (' + k.target + '/month)')
+        : (esc(k.name) + ' (' + k.target + ' units/month)');
       return '<option value="' + esc(k.id) + '"' + (cur === k.id ? ' selected' : '') + '>' + lbl + '</option>';
     }).join('');
   if (!sel.value && kpis.length === 1) sel.value = kpis[0].id;
@@ -6227,6 +6230,8 @@ function calcSaleTrackingRows(agentName, kpi, ym) {
   var rows = [];
   var carryIn = 0; // exact carry coming into the current day
   var cumulative = 0;
+  var kpiItem = kpi.itemId ? itemCatalogue.find(function(x) { return x.id === kpi.itemId; }) : null;
+  // kpiItem is resolved once here (not inside the loop) for efficiency.
 
   for (var d = 1; d <= daysInMonth; d++) {
     var dateStr = year + '-' + String(month).padStart(2, '0') + '-' + String(d).padStart(2, '0');
@@ -6244,7 +6249,12 @@ function calcSaleTrackingRows(agentName, kpi, ym) {
       saleRecords.forEach(function(s) {
         if (toLocalDateStr(s.date) !== dateStr || s.agent !== agentName) return;
         if (kpi.itemId) {
-          actual += (s.items && s.items[kpi.itemId]) || 0;
+          // Dollar-group items (e.g. Recharge) are stored in s.dollarItems; unit-group items in s.items.
+          if (kpiItem && kpiItem.group === 'dollar') {
+            actual += (s.dollarItems && s.dollarItems[kpi.itemId]) || 0;
+          } else {
+            actual += (s.items && s.items[kpi.itemId]) || 0;
+          }
         } else {
           Object.keys(s.items || {}).forEach(function(iid) { actual += s.items[iid]; });
         }
