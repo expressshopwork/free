@@ -20,6 +20,7 @@ let kpiValueMode = 'unit'; // 'unit' or 'currency'
 let kpiTypeSelected = 'Sales';
 let kpiForSelected = 'shop'; // 'shop' or 'agent'
 let kpiSelectedMonth = ''; // '' means no filter (show all)
+let stSelectedMonth = ''; // Sale Tracking selected month
 
 // Chart instances
 let _cTrend = null, _cMix = null, _cAgent = null, _cGrowth = null;
@@ -777,6 +778,7 @@ function navigateTo(page, btn) {
     promotionPage: currentPromoView === 'expired' ? 'Expired Promotion' : 'New Promotion',
     deposit: 'Deposit',
     sale: 'Sale',
+    'sale-tracking': 'Sale Tracking',
     kpi: 'KPI Setting',
     customer: 'Customer',
     settings: 'Settings',
@@ -792,6 +794,7 @@ function navigateTo(page, btn) {
   if (page === 'dashboard') renderDashboard();
   if (page === 'promotionPage') renderPromotionCards();
   if (page === 'kpi') { initKpiMonthPicker(); renderKpiTable(); }
+  if (page === 'sale-tracking') { initSaleTracking(); }
   if (page === 'deposit') { renderDepositTable(); updateDepositKpis(); }
   if (page === 'sale') { renderItemChips(); applyReportFilters(); }
   if (page === 'customer') {
@@ -5970,4 +5973,299 @@ function selectCommuneSuggestion(idx) {
 function closeCommuneSuggestions() {
   var dropdown = g('cov-commune-suggestions');
   if (dropdown) dropdown.style.display = 'none';
+}
+
+// ------------------------------------------------------------
+// Sale Tracking
+// ------------------------------------------------------------
+function initSaleTracking() {
+  if (!stSelectedMonth) stSelectedMonth = ymNow();
+  var picker = g('st-month-picker');
+  if (picker) picker.value = stSelectedMonth;
+  populateStAgentSel();
+  renderSaleTracking();
+}
+
+function setStMonth(mode) {
+  if (mode === 'current') {
+    stSelectedMonth = ymNow();
+  } else if (mode === 'prev') {
+    var base = stSelectedMonth || ymNow();
+    var parts = base.split('-');
+    var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 2, 1);
+    stSelectedMonth = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+  var picker = g('st-month-picker');
+  if (picker) picker.value = stSelectedMonth;
+  renderSaleTracking();
+}
+
+function onStMonthChange() {
+  var picker = g('st-month-picker');
+  stSelectedMonth = picker ? picker.value : ymNow();
+  populateStKpiSel();
+  renderSaleTracking();
+}
+
+function populateStAgentSel() {
+  var wrap = g('st-agent-filter-wrap');
+  var sel = g('st-agent-sel');
+  if (!sel) return;
+
+  // Agents see only themselves — hide the selector
+  if (currentRole === 'agent' && currentUser) {
+    if (wrap) wrap.style.display = 'none';
+    populateStKpiSel();
+    return;
+  }
+  if (wrap) wrap.style.display = '';
+
+  var agents;
+  if (currentRole === 'supervisor' && currentUser) {
+    agents = staffList.filter(function(u) {
+      return u.role === 'Agent' && u.branch === currentUser.branch && u.status === 'active';
+    });
+  } else {
+    agents = staffList.filter(function(u) { return u.role === 'Agent' && u.status === 'active'; });
+  }
+
+  var cur = sel.value;
+  sel.innerHTML = '<option value="">— Select Agent —</option>' +
+    agents.map(function(a) {
+      return '<option value="' + esc(a.id) + '"' + (cur === a.id ? ' selected' : '') + '>' + esc(a.name) + '</option>';
+    }).join('');
+  if (!cur && agents.length === 1) sel.value = agents[0].id;
+  populateStKpiSel();
+}
+
+function onStAgentChange() {
+  populateStKpiSel();
+  renderSaleTracking();
+}
+
+function populateStKpiSel() {
+  var sel = g('st-kpi-sel');
+  if (!sel) return;
+  var agentId = getStAgentId();
+  if (!agentId) {
+    sel.innerHTML = '<option value="">— Select Agent first —</option>';
+    return;
+  }
+  var kpis = kpiList.filter(function(k) {
+    return k.kpiFor === 'agent' && k.assigneeId === agentId && k.valueMode === 'unit';
+  });
+  var cur = sel.value;
+  sel.innerHTML = '<option value="">— Select KPI —</option>' +
+    kpis.map(function(k) {
+      var lbl = k.name + ' (' + k.target + ' ' + esc(getKpiUnitLabel(k) || 'units') + '/month)';
+      return '<option value="' + esc(k.id) + '"' + (cur === k.id ? ' selected' : '') + '>' + lbl + '</option>';
+    }).join('');
+  if (!sel.value && kpis.length === 1) sel.value = kpis[0].id;
+}
+
+function getStAgentId() {
+  if (currentRole === 'agent' && currentUser) return currentUser.id;
+  var sel = g('st-agent-sel');
+  return sel ? sel.value : '';
+}
+
+function renderSaleTracking() {
+  var tbody = g('st-table');
+  var cards = g('st-summary-cards');
+  if (!tbody) return;
+
+  var ym = stSelectedMonth || ymNow();
+  var agentId = getStAgentId();
+  var kpiId = rv('st-kpi-sel');
+
+  if (!agentId) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:#999;">' +
+      '<i class="fas fa-user" style="font-size:2rem;display:block;margin-bottom:8px;"></i>' +
+      'Please select an agent to view tracking.</td></tr>';
+    if (cards) cards.innerHTML = '';
+    return;
+  }
+
+  if (!kpiId) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:#999;">' +
+      '<i class="fas fa-crosshairs" style="font-size:2rem;display:block;margin-bottom:8px;"></i>' +
+      'No monthly unit KPI found for this agent. Please add one in <b>KPI Setting</b>.</td></tr>';
+    if (cards) cards.innerHTML = '';
+    return;
+  }
+
+  var kpi = kpiList.find(function(k) { return k.id === kpiId; });
+  if (!kpi) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:#999;">KPI not found.</td></tr>';
+    if (cards) cards.innerHTML = '';
+    return;
+  }
+
+  var agent = staffList.find(function(u) { return u.id === agentId; });
+  var agentName = agent ? agent.name : '';
+  var unitLabel = getKpiUnitLabel(kpi) || 'Units';
+  var rows = calcSaleTrackingRows(agentName, kpi, ym);
+  var today = todayStr();
+
+  // Summary stats
+  var totalActual = 0;
+  rows.forEach(function(r) { if (!r.isFuture) totalActual += (r.actual || 0); });
+  var remaining = Math.max(0, kpi.target - totalActual);
+  var daysLeft = rows.filter(function(r) { return r.isFuture; }).length;
+  var pct = kpi.target > 0 ? Math.round(totalActual / kpi.target * 100) : 0;
+  var dailyRequired = daysLeft > 0 ? Math.ceil(remaining / daysLeft) : 0;
+  var pctColor = pct >= 100 ? '#1B7D3D' : pct >= 70 ? '#FF9800' : '#E53935';
+
+  // Render summary cards
+  if (cards) {
+    cards.innerHTML =
+      '<div class="kpi-card">' +
+        '<div class="kpi-card-icon kpi-icon-purple"><i class="fas fa-crosshairs"></i></div>' +
+        '<div class="kpi-card-body"><p class="kpi-label">Monthly Target</p>' +
+        '<p class="kpi-value">' + kpi.target + ' <small style="font-size:.75rem;color:#888;">' + esc(unitLabel) + '</small></p></div>' +
+      '</div>' +
+      '<div class="kpi-card">' +
+        '<div class="kpi-card-icon kpi-icon-green"><i class="fas fa-check-circle"></i></div>' +
+        '<div class="kpi-card-body"><p class="kpi-label">Achieved</p>' +
+        '<p class="kpi-value" style="color:' + pctColor + ';">' + totalActual +
+        ' <small style="font-size:.75rem;">(' + pct + '%)</small></p></div>' +
+      '</div>' +
+      '<div class="kpi-card">' +
+        '<div class="kpi-card-icon kpi-icon-orange"><i class="fas fa-hourglass-half"></i></div>' +
+        '<div class="kpi-card-body"><p class="kpi-label">Remaining</p>' +
+        '<p class="kpi-value">' + remaining + ' <small style="font-size:.75rem;color:#888;">' + esc(unitLabel) + '</small></p></div>' +
+      '</div>' +
+      '<div class="kpi-card">' +
+        '<div class="kpi-card-icon kpi-icon-blue"><i class="fas fa-calendar-days"></i></div>' +
+        '<div class="kpi-card-body"><p class="kpi-label">Days Left · Required/Day</p>' +
+        '<p class="kpi-value">' + daysLeft + ' days · ' + dailyRequired + '</p></div>' +
+      '</div>';
+  }
+
+  // Render daily rows
+  var weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  var html = '';
+  rows.forEach(function(r, idx) {
+    var isToday = r.date === today;
+    var rowStyle = isToday ? ' style="background:#f0f9f4;font-weight:600;"' : '';
+
+    // Carry-over column (carryIn — the carry coming into this day)
+    var carryStr;
+    if (r.carryIn === 0) {
+      carryStr = '<span style="color:#aaa;">0</span>';
+    } else if (r.carryIn > 0) {
+      carryStr = '<span style="color:#E53935;">+' + r.carryIn + '</span>';
+    } else {
+      carryStr = '<span style="color:#1B7D3D;">' + r.carryIn + '</span>';
+    }
+
+    // Actual column
+    var actualStr = r.isFuture ? '<span style="color:#bbb;">—</span>' : String(r.actual);
+
+    // Balance column (carry-out — shortfall or surplus after this day)
+    var balStr;
+    if (r.isFuture) {
+      balStr = '<span style="color:#bbb;">—</span>';
+    } else if (r.balance === 0) {
+      balStr = '<span style="color:#888;">0</span>';
+    } else if (r.balance > 0) {
+      balStr = '<span style="color:#E53935;">+' + r.balance + '</span>';
+    } else {
+      balStr = '<span style="color:#1B7D3D;">' + r.balance + '</span>';
+    }
+
+    // Cumulative column
+    var cumStr = r.isFuture ? '<span style="color:#bbb;">—</span>' : String(r.cumulative);
+
+    // Status badge
+    var statusBadge;
+    if (r.isFuture) {
+      statusBadge = '<span class="pill pill-gray">Projected</span>';
+    } else if (r.actual > r.adjustedTarget) {
+      statusBadge = '<span class="pill pill-green">Ahead</span>';
+    } else if (r.actual === r.adjustedTarget) {
+      statusBadge = '<span class="pill pill-green">On Track</span>';
+    } else {
+      statusBadge = '<span class="pill pill-red">Behind</span>';
+    }
+
+    var dayName = weekdays[new Date(r.date + 'T00:00:00').getDay()];
+    var todayBadge = isToday ? ' <span class="pill pill-blue" style="font-size:.65rem;padding:1px 5px;">Today</span>' : '';
+
+    html += '<tr' + rowStyle + '>' +
+      '<td>' + (idx + 1) + '</td>' +
+      '<td>' + esc(r.date) + ' <small style="color:#888;">' + dayName + '</small>' + todayBadge + '</td>' +
+      '<td style="color:#555;">' + r.baseDisplay + '</td>' +
+      '<td>' + carryStr + '</td>' +
+      '<td><strong>' + r.adjustedTarget + '</strong></td>' +
+      '<td>' + actualStr + '</td>' +
+      '<td>' + balStr + '</td>' +
+      '<td>' + cumStr + '</td>' +
+      '<td>' + statusBadge + '</td>' +
+      '</tr>';
+  });
+
+  if (!html) {
+    html = '<tr><td colspan="9" style="text-align:center;padding:40px;color:#999;">No days found for this month.</td></tr>';
+  }
+  tbody.innerHTML = html;
+}
+
+// Computes day-by-day carry-over tracking rows for a given agent, KPI, and year-month.
+// Each row contains: date, baseDisplay, carryIn, adjustedTarget, actual, balance, cumulative, isFuture.
+// carry-over logic: if actual < adjustedTarget, the shortfall carries forward to the next day.
+// If actual > adjustedTarget, the surplus deducts from the next day's target.
+function calcSaleTrackingRows(agentName, kpi, ym) {
+  var parts = ym.split('-');
+  var year = parseInt(parts[0], 10);
+  var month = parseInt(parts[1], 10);
+  var daysInMonth = new Date(year, month, 0).getDate();
+  var monthlyTarget = kpi.target || 0;
+  var baseDaily = monthlyTarget / daysInMonth; // exact float
+
+  var today = todayStr();
+  var rows = [];
+  var carryIn = 0; // exact carry coming into the current day
+  var cumulative = 0;
+
+  for (var d = 1; d <= daysInMonth; d++) {
+    var dateStr = year + '-' + String(month).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    var isFuture = dateStr > today;
+
+    // Adjusted target (exact for carry math; ceil for display so agent always hits an integer)
+    var adjustedExact = baseDaily + carryIn;
+    var adjustedTarget = adjustedExact > 0 ? Math.ceil(adjustedExact) : 0;
+
+    var actual = 0;
+    var carryOut = carryIn; // future days don't update carry
+
+    if (!isFuture) {
+      // Sum actual sales for this agent on this date
+      saleRecords.forEach(function(s) {
+        if (toLocalDateStr(s.date) !== dateStr || s.agent !== agentName) return;
+        if (kpi.itemId) {
+          actual += (s.items && s.items[kpi.itemId]) || 0;
+        } else {
+          Object.keys(s.items || {}).forEach(function(iid) { actual += s.items[iid]; });
+        }
+      });
+      cumulative += actual;
+      // Use exact adjusted target for carry so rounding doesn't drift over the month
+      carryOut = adjustedExact - actual;
+    }
+
+    rows.push({
+      date: dateStr,
+      baseDisplay: Math.round(baseDaily * 10) / 10,
+      carryIn: Math.round(carryIn * 10) / 10,
+      adjustedTarget: adjustedTarget,
+      actual: isFuture ? null : actual,
+      balance: isFuture ? null : Math.round((adjustedExact - actual) * 10) / 10,
+      cumulative: isFuture ? null : cumulative,
+      isFuture: isFuture
+    });
+
+    carryIn = carryOut;
+  }
+  return rows;
 }
