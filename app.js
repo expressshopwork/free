@@ -4277,7 +4277,7 @@ function openKpiModal(item) {
   if (form) form.reset();
   g('kpi-edit-id').value = '';
   kpiTypeSelected = 'Sales';
-  setValueMode('unit');
+  setValueMode('currency');
   kpiForSelected = (item && item.kpiFor) ? item.kpiFor : 'shop';
   selectKpiFor(kpiForSelected);
 
@@ -4331,6 +4331,8 @@ function selectKpiType(el) {
   kpiTypeSelected = type;
   $$('.kpi-type-chip').forEach(function(c) { c.classList.remove('active'); });
   if (el) el.classList.add('active');
+  var autoMode = (type === 'Sales' || type === 'Revenue') ? 'currency' : 'unit';
+  setValueMode(autoMode);
 }
 
 function setValueMode(mode) {
