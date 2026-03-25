@@ -457,6 +457,10 @@
           <i class="fas fa-calendar-check submenu-icon"></i>
           <span>Daily Sale</span>
         </li>
+        <li class="submenu-item" id="nav-sale-tracking" onclick="navigateTo('sale-tracking', null); setActiveSubItem(this)">
+          <i class="fas fa-chart-line submenu-icon"></i>
+          <span>Sale Tracking</span>
+        </li>
         <li class="submenu-item" id="nav-kpi" onclick="navigateTo('kpi', null); setActiveSubItem(this)">
           <i class="fas fa-crosshairs submenu-icon"></i>
           <span>KPI Setting</span>
@@ -983,6 +987,58 @@
 
       </section>
       <!-- END SALE PAGE -->
+
+      <!-- ========== SALE TRACKING PAGE ========== -->
+      <section class="page" id="page-sale-tracking">
+        <div class="page-header">
+          <h2 class="page-header-title"><i class="fas fa-chart-line" style="color:#1B7D3D;margin-right:8px"></i>Sale Tracking</h2>
+        </div>
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+          <div class="filter-group">
+            <label class="filter-label"><i class="fas fa-calendar-alt"></i> Month</label>
+            <input type="month" class="form-input" id="st-month-picker" onchange="onStMonthChange()" />
+          </div>
+          <div class="filter-group" id="st-agent-filter-wrap">
+            <label class="filter-label"><i class="fas fa-user"></i> Agent</label>
+            <select class="form-select" id="st-agent-sel" onchange="onStAgentChange()">
+              <option value="">— Select Agent —</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label"><i class="fas fa-crosshairs"></i> KPI</label>
+            <select class="form-select" id="st-kpi-sel" onchange="renderSaleTracking()">
+              <option value="">— Select KPI —</option>
+            </select>
+          </div>
+          <button class="btn btn-outline" onclick="setStMonth('prev')"><i class="fas fa-chevron-left"></i> Prev</button>
+          <button class="btn btn-outline" onclick="setStMonth('current')"><i class="fas fa-calendar-check"></i> This Month</button>
+        </div>
+        <!-- Summary Cards -->
+        <div class="kpi-grid" id="st-summary-cards" style="margin-bottom:16px;"></div>
+        <!-- Daily Tracking Table -->
+        <div class="table-card">
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Date</th>
+                  <th>Base/Day</th>
+                  <th>Carry-over</th>
+                  <th>Target</th>
+                  <th>Actual</th>
+                  <th>Balance</th>
+                  <th>Cumulative</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="st-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+      <!-- END SALE TRACKING PAGE -->
 
       <!-- ========== CUSTOMER PAGE ========== -->
       <section class="page" id="page-customer">
