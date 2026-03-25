@@ -4525,7 +4525,8 @@ function renderKpiTable() {
       '</td></tr>';
     kpis.forEach(function(k) {
       rowNum++;
-      const typePill = k.type === 'Sales' ? 'pill-green' : k.type === 'Revenue' ? 'pill-orange' : k.type === 'Units' ? 'pill-blue' : 'pill-purple';
+      const typeLabel = k.type || (k.valueMode === 'currency' ? 'Amount' : 'Unit');
+      const typePill = typeLabel === 'Sales' ? 'pill-green' : typeLabel === 'Revenue' || typeLabel === 'Amount' ? 'pill-orange' : typeLabel === 'Units' || typeLabel === 'Unit' ? 'pill-blue' : 'pill-purple';
       const unitLabel = getKpiUnitLabel(k);
       const valueDisplay = k.valueMode === 'currency'
         ? fmtMoney(k.target, esc(k.currency) + ' ')
@@ -4553,7 +4554,7 @@ function renderKpiTable() {
       html += '<tr>' +
         '<td>' + rowNum + '</td>' +
         '<td>' + esc(k.name) + '</td>' +
-        '<td><span class="pill ' + typePill + '">' + esc(k.type) + '</span></td>' +
+        '<td><span class="pill ' + typePill + '">' + esc(typeLabel) + '</span></td>' +
         '<td>' + forLabel + '<br><small style="color:#888;">' + assigneeName + '</small></td>' +
         '<td>' + valueDisplay + '</td>' +
         '<td>' + actualDisplay + '</td>' +
