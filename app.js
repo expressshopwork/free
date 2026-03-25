@@ -6012,13 +6012,17 @@ function populateStAgentSel() {
   var sel = g('st-agent-sel');
   if (!sel) return;
 
-  // Agents see only themselves — hide the selector
+  if (wrap) wrap.style.display = '';
+
+  // Agents see only themselves — auto-fill their name as read-only
   if (currentRole === 'agent' && currentUser) {
-    if (wrap) wrap.style.display = 'none';
+    sel.innerHTML = '<option value="' + esc(currentUser.id) + '">' + esc(currentUser.name) + '</option>';
+    sel.value = currentUser.id;
+    sel.disabled = true;
     populateStKpiSel();
     return;
   }
-  if (wrap) wrap.style.display = '';
+  sel.disabled = false;
 
   var agents;
   if (currentRole === 'supervisor' && currentUser) {
@@ -6051,19 +6055,21 @@ function populateStKpiSel() {
     sel.innerHTML = '<option value="">— Select Agent first —</option>';
     return;
   }
-  var kpis = kpiList.filter(function(k) {
-    return k.kpiFor === 'agent' && k.assigneeId === agentId && k.valueMode === 'unit';
-  });
+  // Items shown in the KPI tracking dropdown (must match itemCatalogue IDs):
+  // Smart Fiber+ (i3), Smart@Home (i2), SmartNas (i4),
+  // Gross Ads (i1), Monthly Upsell (i5), Recharge (i7)
+  var trackItemIds = ['i3', 'i2', 'i4', 'i1', 'i5', 'i7'];
   var cur = sel.value;
   sel.innerHTML = '<option value="">— Select KPI —</option>' +
-    kpis.map(function(k) {
-      var itemLabel = getKpiUnitLabel(k);
-      var lbl = itemLabel
-        ? (esc(itemLabel) + ' — ' + esc(k.name) + ' (' + k.target + '/month)')
-        : (esc(k.name) + ' (' + k.target + ' units/month)');
-      return '<option value="' + esc(k.id) + '"' + (cur === k.id ? ' selected' : '') + '>' + lbl + '</option>';
-    }).join('');
-  if (!sel.value && kpis.length === 1) sel.value = kpis[0].id;
+    trackItemIds.map(function(itemId) {
+      var item = itemCatalogue.find(function(x) { return x.id === itemId; });
+      if (!item) return ''; // skip if item not in catalogue (should not happen)
+      var kpi = kpiList.find(function(k) {
+        return k.kpiFor === 'agent' && k.assigneeId === agentId && k.itemId === itemId;
+      });
+      var lbl = esc(item.name) + (kpi ? ' (' + kpi.target + '/month)' : '');
+      return '<option value="' + esc(itemId) + '"' + (cur === itemId ? ' selected' : '') + '>' + lbl + '</option>';
+    }).filter(function(s) { return s !== ''; }).join('');
 }
 
 function getStAgentId() {
@@ -6079,7 +6085,7 @@ function renderSaleTracking() {
 
   var ym = stSelectedMonth || ymNow();
   var agentId = getStAgentId();
-  var kpiId = rv('st-kpi-sel');
+  var selectedItemId = rv('st-kpi-sel');
 
   if (!agentId) {
     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:#999;">' +
@@ -6089,17 +6095,23 @@ function renderSaleTracking() {
     return;
   }
 
-  if (!kpiId) {
+  if (!selectedItemId) {
     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:#999;">' +
       '<i class="fas fa-crosshairs" style="font-size:2rem;display:block;margin-bottom:8px;"></i>' +
-      'No monthly unit KPI found for this agent. Please add one in <b>KPI Setting</b>.</td></tr>';
+      'Please select an item from the KPI dropdown.</td></tr>';
     if (cards) cards.innerHTML = '';
     return;
   }
 
-  var kpi = kpiList.find(function(k) { return k.id === kpiId; });
+  var kpi = kpiList.find(function(k) {
+    return k.kpiFor === 'agent' && k.assigneeId === agentId && k.itemId === selectedItemId;
+  });
   if (!kpi) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:#999;">KPI not found.</td></tr>';
+    var itemDef = itemCatalogue.find(function(x) { return x.id === selectedItemId; });
+    var itemName = itemDef ? itemDef.name : selectedItemId;
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:#999;">' +
+      '<i class="fas fa-crosshairs" style="font-size:2rem;display:block;margin-bottom:8px;"></i>' +
+      'No KPI target set for <b>' + esc(itemName) + '</b>. Please add one in <b>KPI Setting</b>.</td></tr>';
     if (cards) cards.innerHTML = '';
     return;
   }
