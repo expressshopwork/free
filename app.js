@@ -2340,12 +2340,17 @@ function calcKpiActual(kpi, ym) {
       filtered.forEach(function(s) { Object.values(s.items || {}).forEach(function(v) { actual += v; }); });
     }
   } else {
-    filtered.forEach(function(s) {
-      Object.keys(s.dollarItems || {}).forEach(function(iid) {
-        const item = itemCatalogue.find(function(x) { return x.id === iid; });
-        if (item && !item.noAutoSum && !item.noAutoRevenue) actual += s.dollarItems[iid] * (item.price || 1);
+    if (kpi.itemId) {
+      const kpiItem = itemCatalogue.find(function(x) { return x.id === kpi.itemId; });
+      filtered.forEach(function(s) { actual += ((s.dollarItems && s.dollarItems[kpi.itemId]) || 0) * (kpiItem ? kpiItem.price || 1 : 1); });
+    } else {
+      filtered.forEach(function(s) {
+        Object.keys(s.dollarItems || {}).forEach(function(iid) {
+          const item = itemCatalogue.find(function(x) { return x.id === iid; });
+          if (item && !item.noAutoSum && !item.noAutoRevenue) actual += s.dollarItems[iid] * (item.price || 1);
+        });
       });
-    });
+    }
   }
   return actual;
 }
@@ -4327,6 +4332,7 @@ function openKpiModal(item) {
         const itemSel = g('kpi-item-sel'); if (itemSel && item.itemId) itemSel.value = item.itemId;
       } else {
         const csEl = g('kpi-currency-sel'); if (csEl) csEl.value = item.currency || 'USD';
+        const ciEl = g('kpi-currency-item-sel'); if (ciEl && item.itemId) ciEl.value = item.itemId;
       }
     }
     if (item.kpiFor === 'shop') {
@@ -4436,6 +4442,7 @@ function setValueMode(mode) {
     if (curField) curField.style.display = '';
     if (unitToggle) unitToggle.classList.remove('active');
     if (curToggle) curToggle.classList.add('active');
+    populateKpiCurrencyItemSel();
   }
 }
 
@@ -4445,6 +4452,16 @@ function populateKpiItemSel() {
   const allItems = itemCatalogue.filter(function(x) { return x.status === 'active' && x.id !== ITEM_ID_REVENUE; });
   sel.innerHTML = '<option value="">All Items</option>' +
     allItems.map(function(item) {
+      return '<option value="' + esc(item.id) + '">' + esc(item.name) + '</option>';
+    }).join('');
+}
+
+function populateKpiCurrencyItemSel() {
+  const sel = g('kpi-currency-item-sel');
+  if (!sel) return;
+  const dollarItems = itemCatalogue.filter(function(x) { return x.status === 'active' && x.group === 'dollar' && x.id !== ITEM_ID_REVENUE; });
+  sel.innerHTML = '<option value="">All Dollar Items</option>' +
+    dollarItems.map(function(item) {
       return '<option value="' + esc(item.id) + '">' + esc(item.name) + '</option>';
     }).join('');
 }
@@ -4478,7 +4495,8 @@ function submitKpi(e) {
     assigneeBranch: kpiForSelected === 'agent' ? rv('kpi-agent-branch') : '',
     target: parseFloat(rv('kpi-target')) || 0,
     valueMode: kpiModeSelected === 'point' ? 'unit' : kpiValueMode,
-    itemId: (kpiModeSelected !== 'point' && kpiValueMode === 'unit') ? rv('kpi-item-sel') : '',
+    itemId: (kpiModeSelected !== 'point' && kpiValueMode === 'unit') ? rv('kpi-item-sel') :
+            (kpiModeSelected !== 'point' && kpiValueMode === 'currency') ? rv('kpi-currency-item-sel') : '',
     unit: (kpiModeSelected !== 'point' && kpiValueMode === 'unit') ? rv('kpi-unit-val') : '',
     currency: (kpiModeSelected !== 'point' && kpiValueMode === 'currency') ? rv('kpi-currency-sel') : '',
     pointItems: kpiModeSelected === 'point' ? getKpiPointItems() : [],
