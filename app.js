@@ -2774,7 +2774,7 @@ function deleteNewCustomer(id) {
   }, 'Delete Customer', 'Delete');
 }
 
-function renderNewCustomerTable() {
+function renderNewCustomerTable(explicit) {
   const tbody = g('new-customer-table');
   if (!tbody) return;
   const searchVal = (rv('nc-search') || '').toLowerCase().trim();
@@ -2786,6 +2786,7 @@ function renderNewCustomerTable() {
       })
     : baseList;
   if (!list.length) {
+    if (explicit && searchVal) { showAlert('No results found for "' + searchVal + '"', 'warning'); }
     tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:40px;color:#999;"><i class="fas fa-users" style="font-size:2rem;display:block;margin-bottom:8px;"></i>' + (searchVal ? 'No results found' : 'No customers yet') + '</td></tr>';
     return;
   }
@@ -2952,7 +2953,7 @@ function deleteTopUp(id) {
   }, 'Delete Top-Up Record', 'Delete');
 }
 
-function renderTopUpTable() {
+function renderTopUpTable(explicit) {
   const tbody = g('topup-table');
   if (!tbody) return;
 
@@ -3032,6 +3033,7 @@ function renderTopUpTable() {
     return expA - expB;
   });
   if (!tuList.length) {
+    if (explicit && tuSearchVal) { showAlert('No results found for "' + tuSearchVal + '"', 'warning'); }
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:#999;"><i class="fas fa-coins" style="font-size:2rem;display:block;margin-bottom:8px;"></i>No results found</td></tr>';
     return;
   }
@@ -3264,7 +3266,7 @@ function deleteTermination(id) {
   }, 'Delete Termination Record', 'Delete');
 }
 
-function renderTerminationTable() {
+function renderTerminationTable(explicit) {
   const tbody = g('termination-table');
   if (!tbody) return;
   const baseTermList = getBaseRecordsForRole(terminationList);
@@ -3280,6 +3282,7 @@ function renderTerminationTable() {
       })
     : baseTermList;
   if (!termList.length) {
+    if (explicit && termSearchVal) { showAlert('No results found for "' + termSearchVal + '"', 'warning'); }
     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:#999;"><i class="fas fa-times-circle" style="font-size:2rem;display:block;margin-bottom:8px;"></i>No results found</td></tr>';
     return;
   }
@@ -3306,7 +3309,7 @@ function renderTerminationTable() {
 // ------------------------------------------------------------
 // Out Coverage Functions
 // ------------------------------------------------------------
-function renderOutCoverageTable() {
+function renderOutCoverageTable(explicit) {
   const tbody = g('out-coverage-table');
   if (!tbody) return;
   const baseList = getBaseRecordsForRole(outCoverageList);
@@ -3318,6 +3321,7 @@ function renderOutCoverageTable() {
       })
     : baseList;
   if (!list.length) {
+    if (explicit && searchVal) { showAlert('No results found for "' + searchVal + '"', 'warning'); }
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:#999;"><i class="fas fa-signal" style="font-size:2rem;display:block;margin-bottom:8px;"></i>' + (searchVal ? 'No results found' : 'No out of coverage records yet') + '</td></tr>';
     return;
   }
