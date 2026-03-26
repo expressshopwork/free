@@ -1068,7 +1068,7 @@
           <div class="filter-bar" style="padding:8px 0;">
             <div class="filter-group" style="flex:1;max-width:340px;">
               <label class="filter-label"><i class="fas fa-magnifying-glass"></i> Search</label>
-              <input type="text" class="form-input" id="nc-search" placeholder="Search by name or phone…" oninput="renderNewCustomerTable()" />
+              <input type="text" class="form-input" id="nc-search" placeholder="Search by name or phone…" oninput="renderNewCustomerTable()" onkeydown="if(event.key==='Enter')renderNewCustomerTable(true)" />
             </div>
             <button class="btn btn-outline" onclick="document.getElementById('nc-search').value='';renderNewCustomerTable()"><i class="fas fa-xmark"></i> Clear</button>
           </div>
@@ -1092,9 +1092,8 @@
           <div class="filter-bar" style="padding:8px 0;">
             <div class="filter-group" style="flex:1;max-width:340px;">
               <label class="filter-label"><i class="fas fa-magnifying-glass"></i> Search</label>
-              <input type="text" class="form-input" id="tu-search" placeholder="Search by name or phone…" oninput="renderTopUpTable()" onkeydown="if(event.key==='Enter')renderTopUpTable()" />
+              <input type="text" class="form-input" id="tu-search" placeholder="Search by name or phone…" oninput="renderTopUpTable()" onkeydown="if(event.key==='Enter')renderTopUpTable(true)" />
             </div>
-            <button class="btn btn-primary" onclick="renderTopUpTable()"><i class="fas fa-magnifying-glass"></i> Search</button>
             <button class="btn btn-outline" onclick="document.getElementById('tu-search').value='';renderTopUpTable()"><i class="fas fa-xmark"></i> Clear</button>
           </div>
           <div id="topup-expiry-notice"></div>
@@ -1118,7 +1117,7 @@
           <div class="filter-bar" style="padding:8px 0;">
             <div class="filter-group" style="flex:1;max-width:340px;">
               <label class="filter-label"><i class="fas fa-magnifying-glass"></i> Search</label>
-              <input type="text" class="form-input" id="term-search" placeholder="Search by name or phone…" oninput="renderTerminationTable()" />
+              <input type="text" class="form-input" id="term-search" placeholder="Search by name or phone…" oninput="renderTerminationTable()" onkeydown="if(event.key==='Enter')renderTerminationTable(true)" />
             </div>
             <button class="btn btn-outline" onclick="document.getElementById('term-search').value='';renderTerminationTable()"><i class="fas fa-xmark"></i> Clear</button>
           </div>
@@ -1139,7 +1138,7 @@
           <div class="filter-bar" style="padding:8px 0;">
             <div class="filter-group" style="flex:1;max-width:340px;">
               <label class="filter-label"><i class="fas fa-magnifying-glass"></i> Search</label>
-              <input type="text" class="form-input" id="oc-search" placeholder="Search by name or phone…" oninput="renderOutCoverageTable()" />
+              <input type="text" class="form-input" id="oc-search" placeholder="Search by name or phone…" oninput="renderOutCoverageTable()" onkeydown="if(event.key==='Enter')renderOutCoverageTable(true)" />
             </div>
             <button class="btn btn-outline" onclick="document.getElementById('oc-search').value='';renderOutCoverageTable()"><i class="fas fa-xmark"></i> Clear</button>
           </div>
