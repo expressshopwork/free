@@ -6146,11 +6146,16 @@ function populateStAgentSel() {
   }
 
   var cur = sel.value;
-  sel.innerHTML = '<option value="">— Select Agent —</option>' +
+  var shopOption = '';
+  if (currentRole === 'supervisor' && currentUser) {
+    var shopVal = 'shop_' + currentUser.id;
+    shopOption = '<option value="' + esc(shopVal) + '"' + (cur === shopVal ? ' selected' : '') + '>\uD83C\uDFEA Shop: ' + esc(currentUser.branch) + '</option>';
+  }
+  sel.innerHTML = '<option value="">— Select Agent —</option>' + shopOption +
     agents.map(function(a) {
       return '<option value="' + esc(a.id) + '"' + (cur === a.id ? ' selected' : '') + '>' + esc(a.name) + '</option>';
     }).join('');
-  if (!cur && agents.length === 1) sel.value = agents[0].id;
+  if (!cur && agents.length === 1 && !shopOption) sel.value = agents[0].id;
   populateStKpiSel();
 }
 
@@ -6167,6 +6172,8 @@ function populateStKpiSel() {
     sel.innerHTML = '<option value="">— Select Agent first —</option>';
     return;
   }
+  var isShopView = agentId.indexOf('shop_') === 0;
+  var supervisorId = isShopView ? agentId.slice(5) : '';
   // Items shown in the KPI tracking dropdown (must match itemCatalogue IDs):
   // Smart Fiber+ (i3), Smart@Home (i2), SmartNas (i4),
   // Gross Ads (i1), Monthly Upsell (i5), Recharge (i7)
@@ -6176,9 +6183,28 @@ function populateStKpiSel() {
     trackItemIds.map(function(itemId) {
       var item = itemCatalogue.find(function(x) { return x.id === itemId; });
       if (!item) return ''; // skip if item not in catalogue (should not happen)
-      var kpi = kpiList.find(function(k) {
-        return k.kpiFor === 'agent' && k.assigneeId === agentId && k.itemId === itemId;
-      });
+      var kpi;
+      if (isShopView) {
+        kpi = kpiList.find(function(k) {
+          return k.kpiFor === 'shop' && k.assigneeId === supervisorId && k.itemId === itemId;
+        });
+      } else {
+        kpi = kpiList.find(function(k) {
+          return k.kpiFor === 'agent' && k.assigneeId === agentId && k.itemId === itemId;
+        });
+        // Fallback: use shop-level KPI for this agent's branch
+        if (!kpi) {
+          var agentUser = staffList.find(function(u) { return u.id === agentId; });
+          if (agentUser && agentUser.branch) {
+            var branchSup = staffList.find(function(u) { return u.role === 'Supervisor' && u.branch === agentUser.branch; });
+            if (branchSup) {
+              kpi = kpiList.find(function(k) {
+                return k.kpiFor === 'shop' && k.assigneeId === branchSup.id && k.itemId === itemId;
+              });
+            }
+          }
+        }
+      }
       var lbl = esc(item.name) + (kpi ? ' (' + kpi.target + '/month)' : '');
       return '<option value="' + esc(itemId) + '"' + (cur === itemId ? ' selected' : '') + '>' + lbl + '</option>';
     }).filter(function(s) { return s !== ''; }).join('');
@@ -6202,7 +6228,7 @@ function renderSaleTracking() {
   if (!agentId) {
     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:#999;">' +
       '<i class="fas fa-user" style="font-size:2rem;display:block;margin-bottom:8px;"></i>' +
-      'Please select an agent to view tracking.</td></tr>';
+      'Please select an agent or shop to view tracking.</td></tr>';
     if (cards) cards.innerHTML = '';
     return;
   }
@@ -6215,9 +6241,38 @@ function renderSaleTracking() {
     return;
   }
 
-  var kpi = kpiList.find(function(k) {
-    return k.kpiFor === 'agent' && k.assigneeId === agentId && k.itemId === selectedItemId;
-  });
+  var isShopView = agentId.indexOf('shop_') === 0;
+  var supervisorId = isShopView ? agentId.slice(5) : '';
+  var kpi = null;
+  var agentName = '';
+  var filterBranch = '';
+
+  if (isShopView) {
+    kpi = kpiList.find(function(k) {
+      return k.kpiFor === 'shop' && k.assigneeId === supervisorId && k.itemId === selectedItemId;
+    });
+    var supUser = staffList.find(function(u) { return u.id === supervisorId; });
+    filterBranch = supUser ? supUser.branch : '';
+  } else {
+    kpi = kpiList.find(function(k) {
+      return k.kpiFor === 'agent' && k.assigneeId === agentId && k.itemId === selectedItemId;
+    });
+    // Fallback: use shop-level KPI for this agent's branch
+    if (!kpi) {
+      var agentUser = staffList.find(function(u) { return u.id === agentId; });
+      if (agentUser && agentUser.branch) {
+        var branchSup = staffList.find(function(u) { return u.role === 'Supervisor' && u.branch === agentUser.branch; });
+        if (branchSup) {
+          kpi = kpiList.find(function(k) {
+            return k.kpiFor === 'shop' && k.assigneeId === branchSup.id && k.itemId === selectedItemId;
+          });
+        }
+      }
+    }
+    var agentRec = staffList.find(function(u) { return u.id === agentId; });
+    agentName = agentRec ? agentRec.name : '';
+  }
+
   if (!kpi) {
     var itemDef = itemCatalogue.find(function(x) { return x.id === selectedItemId; });
     var itemName = itemDef ? itemDef.name : selectedItemId;
@@ -6228,10 +6283,8 @@ function renderSaleTracking() {
     return;
   }
 
-  var agent = staffList.find(function(u) { return u.id === agentId; });
-  var agentName = agent ? agent.name : '';
   var unitLabel = getKpiUnitLabel(kpi) || 'Units';
-  var rows = calcSaleTrackingRows(agentName, kpi, ym);
+  var rows = calcSaleTrackingRows(agentName, kpi, ym, filterBranch);
   var today = todayStr();
 
   // Summary stats
@@ -6342,7 +6395,7 @@ function renderSaleTracking() {
 // Each row contains: date, baseDisplay, carryIn, adjustedTarget, actual, balance, cumulative, isFuture.
 // carry-over logic: if actual < adjustedTarget, the shortfall carries forward to the next day.
 // If actual > adjustedTarget, the surplus deducts from the next day's target.
-function calcSaleTrackingRows(agentName, kpi, ym) {
+function calcSaleTrackingRows(agentName, kpi, ym, branchFilter) {
   var parts = ym.split('-');
   var year = parseInt(parts[0], 10);
   var month = parseInt(parts[1], 10);
@@ -6369,9 +6422,11 @@ function calcSaleTrackingRows(agentName, kpi, ym) {
     var carryOut = carryIn; // future days don't update carry
 
     if (!isFuture) {
-      // Sum actual sales for this agent on this date
+      // Sum actual sales for this agent/shop on this date
       saleRecords.forEach(function(s) {
-        if (toLocalDateStr(s.date) !== dateStr || s.agent !== agentName) return;
+        if (toLocalDateStr(s.date) !== dateStr) return;
+        var shouldSkip = branchFilter ? s.branch !== branchFilter : s.agent !== agentName;
+        if (shouldSkip) return;
         if (kpi.itemId) {
           // Dollar-group items (e.g. Recharge) are stored in s.dollarItems; unit-group items in s.items.
           if (kpiItem && kpiItem.group === 'dollar') {
