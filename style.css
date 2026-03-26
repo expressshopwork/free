@@ -1004,6 +1004,42 @@ input, select, textarea, button {
   opacity: .75;
   font-size: .75rem;
 }
+.kpi-point-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #fafafa;
+}
+.kpi-point-item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kpi-point-item-name {
+  flex: 1;
+  font-size: .88rem;
+  color: #333;
+}
+.kpi-point-input {
+  width: 72px !important;
+  padding: 4px 8px !important;
+  text-align: center;
+}
+.kpi-point-item-unit {
+  font-size: .78rem;
+  color: #888;
+  min-width: 26px;
+}
+.kpi-point-hint {
+  font-size: .8rem;
+  color: #888;
+  margin: 0 0 6px;
+}
 .data-table tbody tr:hover td { background: transparent !important; }
 .data-table tbody tr:nth-child(even) td { background: #FAFAFA; }
 .data-table tbody tr:nth-child(even):hover td { background: transparent; }

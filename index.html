@@ -830,7 +830,7 @@
         <div class="table-card">
           <div class="table-responsive">
             <table class="data-table">
-              <thead><tr><th>#</th><th>KPI Name</th><th>Type</th><th>For</th><th>Target</th><th>Actual</th><th>Achievement</th><th>Period</th><th>Actions</th></tr></thead>
+              <thead><tr><th>#</th><th>KPI Name</th><th>Mode</th><th>Type</th><th>For</th><th>Target</th><th>Actual</th><th>Achievement</th><th>Period</th><th>Actions</th></tr></thead>
               <tbody id="kpi-table"></tbody>
             </table>
           </div>
@@ -1954,6 +1954,19 @@
       </div>
       <form id="form-kpi" onsubmit="submitKPI(event)">
         <div class="modal-body">
+          <!-- KPI Mode: Volume-based or Point-based -->
+          <div class="form-group">
+            <label class="form-label">KPI Mode <span class="required">*</span></label>
+            <div class="toggle-btn-group" style="width:100%;">
+              <button type="button" class="toggle-btn active" id="kpi-kpimode-volume" onclick="switchKpiScheme('volume')" style="flex:1;">
+                <i class="fas fa-chart-bar"></i> Volume-based
+              </button>
+              <button type="button" class="toggle-btn" id="kpi-kpimode-point" onclick="switchKpiScheme('point')" style="flex:1;">
+                <i class="fas fa-star"></i> Point-based
+              </button>
+            </div>
+          </div>
+
           <!-- KPI For: Shop or Agent -->
           <div class="form-group">
             <label class="form-label">KPI For <span class="required">*</span></label>
@@ -1993,7 +2006,7 @@
             <label class="form-label" for="kpi-name">KPI Name <span class="required">*</span></label>
             <input type="text" class="form-input" id="kpi-name" placeholder="Enter KPI name" required />
           </div>
-          <div class="form-group">
+          <div class="form-group" id="kpi-type-group">
             <label class="form-label">KPI Type <span class="required">*</span></label>
             <div class="chip-group">
               <button type="button" class="chip kpi-type-chip active" id="kpi-chip-Sales" data-value="Sales" onclick="selectKpiType(this)">Sales</button>
@@ -2006,7 +2019,7 @@
             <label class="form-label" for="kpi-target">Target Value <span class="required">*</span></label>
             <input type="number" class="form-input" id="kpi-target" placeholder="0" min="0" required />
           </div>
-          <div class="form-group">
+          <div class="form-group" id="kpi-valuemode-group">
             <label class="form-label">Value Mode</label>
             <div class="toggle-btn-group">
               <button type="button" class="toggle-btn active" id="kpi-unit-toggle" onclick="selectKpiMode('unit')"><i class="fas fa-boxes-stacked"></i> Unit</button>
@@ -2027,6 +2040,12 @@
               <option value="USD">USD ($)</option>
               <option value="KHR">KHR (៛)</option>
             </select>
+          </div>
+          <!-- Point Items Configuration (shown when Point-based KPI mode is selected) -->
+          <div class="form-group" id="kpi-point-items-field" style="display:none;">
+            <label class="form-label">Point Configuration <span class="required">*</span></label>
+            <p class="kpi-point-hint">Assign points earned per unit sold for each item.</p>
+            <div id="kpi-point-items-list" class="kpi-point-items-list"></div>
           </div>
           <div class="form-group">
             <label class="form-label" for="kpi-period">Period <span class="required">*</span></label>
