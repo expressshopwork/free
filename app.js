@@ -19,6 +19,8 @@ let itemGroupSelected = 'unit'; // 'unit' or 'dollar'
 let kpiValueMode = 'unit'; // 'unit' or 'currency'
 let kpiTypeSelected = 'Sales';
 let kpiForSelected = 'shop'; // 'shop' or 'agent'
+let kpiModeSelected = 'volume'; // 'volume' or 'point'
+var _kpiEditPointItems = null; // point items when editing a point-based KPI
 let kpiSelectedMonth = ''; // '' means no filter (show all)
 let stSelectedMonth = ''; // Sale Tracking selected month
 
@@ -2302,6 +2304,7 @@ function renderDashboard() {
 // KPI vs Actual Achievement Dashboard
 // ------------------------------------------------------------
 function getKpiUnitLabel(kpi) {
+  if (kpi.kpiMode === 'point') return 'pts';
   if (kpi.itemId) {
     var item = itemCatalogue.find(function(x) { return x.id === kpi.itemId; });
     if (item) return item.name;
@@ -2321,6 +2324,15 @@ function calcKpiActual(kpi, ym) {
     if (sup) filtered = currSales.filter(function(s) { return s.branch === sup.branch; });
   }
   let actual = 0;
+  if (kpi.kpiMode === 'point') {
+    var pointItems = kpi.pointItems || [];
+    filtered.forEach(function(s) {
+      pointItems.forEach(function(pi) {
+        actual += ((s.items && s.items[pi.itemId]) || 0) * pi.points;
+      });
+    });
+    return actual;
+  }
   if (kpi.valueMode === 'unit') {
     if (kpi.itemId) {
       filtered.forEach(function(s) { actual += (s.items && s.items[kpi.itemId]) || 0; });
@@ -2504,19 +2516,24 @@ function renderDashboardKpiSection() {
     var rows = kpiData.map(function(d) {
       var pct = d.pct;
       var pctClass = gaugePillClass(pct);
+      var isPoint = d.k.kpiMode === 'point';
+      var modePill = isPoint
+        ? '<span class="pill pill-purple" style="font-size:.7rem;"><i class="fas fa-star"></i> Point</span>'
+        : '<span class="pill pill-teal" style="font-size:.7rem;"><i class="fas fa-chart-bar"></i> Volume</span>';
       var forLabel = d.k.kpiFor === 'shop' ? '<span class="pill pill-blue">Shop</span>' : '<span class="pill pill-orange">Agent</span>';
       var assigneeName = d.assignee ? esc(d.assignee.name) : (d.k.assigneeBranch ? esc(d.k.assigneeBranch) : '—');
-      var valueDisplay = d.k.valueMode === 'currency'
+      var valueDisplay = (!isPoint && d.k.valueMode === 'currency')
         ? fmtMoney(d.k.target, esc(d.k.currency) + ' ') + ' / ' + fmtMoney(d.actual, esc(d.k.currency) + ' ')
         : (function() { var ul = getKpiUnitLabel(d.k); return d.k.target + ' / ' + d.actual + (ul ? ' ' + esc(ul) : ''); })();
       return '<tr>' +
         '<td>' + esc(d.k.name) + '</td>' +
+        '<td>' + modePill + '</td>' +
         '<td>' + forLabel + ' <small style="color:#888;">' + assigneeName + '</small></td>' +
         '<td>' + valueDisplay + '</td>' +
         '<td><span class="pill ' + pctClass + '">' + pct + '%</span></td>' +
         '</tr>';
     }).join('');
-    tableWrap.innerHTML = '<table class="data-table" style="margin-top:8px;"><thead><tr><th>KPI</th><th>Assignee</th><th>Target / Actual</th><th>Achievement</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    tableWrap.innerHTML = '<table class="data-table" style="margin-top:8px;"><thead><tr><th>KPI</th><th>Mode</th><th>Assignee</th><th>Target / Actual</th><th>Achievement</th></tr></thead><tbody>' + rows + '</tbody></table>';
   }
 }
 // ------------------------------------------------------------
@@ -4301,11 +4318,16 @@ function openKpiModal(item) {
     const chip = g('kpi-chip-' + kpiTypeSelected);
     if (chip) chip.classList.add('active');
 
-    setValueMode(item.valueMode || 'unit');
-    if (item.valueMode === 'unit') {
-      const itemSel = g('kpi-item-sel'); if (itemSel && item.itemId) itemSel.value = item.itemId;
-    } else {
-      const csEl = g('kpi-currency-sel'); if (csEl) csEl.value = item.currency || 'USD';
+    _kpiEditPointItems = item.pointItems || null;
+    switchKpiScheme(item.kpiMode === 'point' ? 'point' : 'volume');
+
+    if (item.kpiMode !== 'point') {
+      setValueMode(item.valueMode || 'unit');
+      if (item.valueMode === 'unit') {
+        const itemSel = g('kpi-item-sel'); if (itemSel && item.itemId) itemSel.value = item.itemId;
+      } else {
+        const csEl = g('kpi-currency-sel'); if (csEl) csEl.value = item.currency || 'USD';
+      }
     }
     if (item.kpiFor === 'shop') {
       populateKpiShopAssignee(item.assigneeId);
@@ -4322,6 +4344,8 @@ function openKpiModal(item) {
   } else {
     if (title) title.textContent = 'Add KPI';
     if (btn) btn.textContent = 'Add KPI';
+    _kpiEditPointItems = null;
+    switchKpiScheme('volume');
   }
   openModal('modal-kpi');
 }
@@ -4333,6 +4357,65 @@ function selectKpiType(el) {
   if (el) el.classList.add('active');
   var autoMode = (type === 'Sales' || type === 'Revenue') ? 'currency' : 'unit';
   setValueMode(autoMode);
+}
+
+function switchKpiScheme(mode) {
+  kpiModeSelected = mode;
+  var volBtn = g('kpi-kpimode-volume');
+  var ptBtn = g('kpi-kpimode-point');
+  if (volBtn) volBtn.classList.toggle('active', mode === 'volume');
+  if (ptBtn) ptBtn.classList.toggle('active', mode === 'point');
+  var isPoint = mode === 'point';
+  var typeGroup = g('kpi-type-group');
+  var valuemodeGroup = g('kpi-valuemode-group');
+  if (typeGroup) typeGroup.style.display = isPoint ? 'none' : '';
+  if (valuemodeGroup) valuemodeGroup.style.display = isPoint ? 'none' : '';
+  if (isPoint) {
+    var unitField = g('kpi-unit-field');
+    var curField = g('kpi-currency-field');
+    if (unitField) unitField.style.display = 'none';
+    if (curField) curField.style.display = 'none';
+  } else {
+    // When restoring volume mode, ensure a valid KPI type chip is active
+    if (!g('kpi-chip-' + kpiTypeSelected) || kpiTypeSelected === 'Point') {
+      kpiTypeSelected = 'Sales';
+      $$('.kpi-type-chip').forEach(function(c) { c.classList.remove('active'); });
+      var salesChip = g('kpi-chip-Sales');
+      if (salesChip) salesChip.classList.add('active');
+      setValueMode('currency');
+    } else {
+      setValueMode(kpiValueMode);
+    }
+  }
+  var pointField = g('kpi-point-items-field');
+  if (pointField) pointField.style.display = isPoint ? '' : 'none';
+  if (isPoint) renderKpiPointItemsConfig();
+}
+
+function renderKpiPointItemsConfig() {
+  var container = g('kpi-point-items-list');
+  if (!container) return;
+  var allItems = itemCatalogue.filter(function(x) { return x.status === 'active' && x.id !== ITEM_ID_REVENUE; });
+  container.innerHTML = allItems.map(function(item) {
+    var existing = _kpiEditPointItems ? _kpiEditPointItems.find(function(p) { return p.itemId === item.id; }) : null;
+    var pts = existing ? existing.points : 0;
+    return '<div class="kpi-point-item-row">' +
+      '<span class="kpi-point-item-name">' + esc(item.name) + '</span>' +
+      '<input type="number" class="form-input kpi-point-input" min="0" step="1" placeholder="0" ' +
+      'data-item-id="' + esc(item.id) + '" value="' + pts + '" />' +
+      '<span class="kpi-point-item-unit">pts</span>' +
+      '</div>';
+  }).join('');
+}
+
+function getKpiPointItems() {
+  var inputs = $$('#kpi-point-items-list .kpi-point-input');
+  var result = [];
+  inputs.forEach(function(input) {
+    var pts = parseFloat(input.value) || 0;
+    if (pts > 0) result.push({ itemId: input.getAttribute('data-item-id'), points: pts });
+  });
+  return result;
 }
 
 function setValueMode(mode) {
@@ -4388,20 +4471,23 @@ function submitKpi(e) {
   const obj = {
     id: editId || uid(),
     name: rv('kpi-name'),
-    type: kpiTypeSelected,
+    kpiMode: kpiModeSelected,
+    type: kpiModeSelected === 'point' ? 'Point' : kpiTypeSelected,
     kpiFor: kpiForSelected,
     assigneeId: kpiForSelected === 'shop' ? rv('kpi-shop-assignee') : rv('kpi-agent-assignee'),
     assigneeBranch: kpiForSelected === 'agent' ? rv('kpi-agent-branch') : '',
     target: parseFloat(rv('kpi-target')) || 0,
-    valueMode: kpiValueMode,
-    itemId: kpiValueMode === 'unit' ? rv('kpi-item-sel') : '',
-    unit: kpiValueMode === 'unit' ? rv('kpi-unit-val') : '',
-    currency: kpiValueMode === 'currency' ? rv('kpi-currency-sel') : '',
+    valueMode: kpiModeSelected === 'point' ? 'unit' : kpiValueMode,
+    itemId: (kpiModeSelected !== 'point' && kpiValueMode === 'unit') ? rv('kpi-item-sel') : '',
+    unit: (kpiModeSelected !== 'point' && kpiValueMode === 'unit') ? rv('kpi-unit-val') : '',
+    currency: (kpiModeSelected !== 'point' && kpiValueMode === 'currency') ? rv('kpi-currency-sel') : '',
+    pointItems: kpiModeSelected === 'point' ? getKpiPointItems() : [],
     period: rv('kpi-period')
   };
   if (!obj.name) { showAlert('Please enter KPI name'); return; }
   if (kpiForSelected === 'shop' && !obj.assigneeId) { showAlert('Please select a supervisor'); return; }
   if (kpiForSelected === 'agent' && !obj.assigneeId) { showAlert('Please select an agent'); return; }
+  if (kpiModeSelected === 'point' && !obj.pointItems.length) { showAlert('Please assign points to at least one item.'); return; }
   if (editId) {
     const idx = kpiList.findIndex(function(x) { return x.id === editId; });
     if (idx >= 0) kpiList[idx] = obj;
@@ -4498,7 +4584,7 @@ function renderKpiTable() {
   var visibleKpis = getVisibleKpis();
 
   if (!visibleKpis.length) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:#999;"><i class="fas fa-chart-line" style="font-size:2rem;display:block;margin-bottom:8px;"></i>No KPIs defined yet</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:#999;"><i class="fas fa-chart-line" style="font-size:2rem;display:block;margin-bottom:8px;"></i>No KPIs defined yet</td></tr>';
     return;
   }
 
@@ -4519,16 +4605,17 @@ function renderKpiTable() {
   branchOrder.forEach(function(branch) {
     var kpis = branchMap[branch];
     var rowNum = 0;
-    html += '<tr><td colspan="9" class="kpi-branch-header">' +
+    html += '<tr><td colspan="10" class="kpi-branch-header">' +
       '<i class="fas fa-building" style="margin-right:6px;"></i>' + esc(branch) +
       ' <span class="kpi-branch-count">(' + kpis.length + ' KPI' + (kpis.length !== 1 ? 's' : '') + ')</span>' +
       '</td></tr>';
     kpis.forEach(function(k) {
       rowNum++;
+      var isPoint = k.kpiMode === 'point';
       const typeLabel = k.type || (k.valueMode === 'currency' ? 'Amount' : 'Unit');
       const typePill = typeLabel === 'Sales' ? 'pill-green' : typeLabel === 'Revenue' || typeLabel === 'Amount' ? 'pill-orange' : typeLabel === 'Units' || typeLabel === 'Unit' ? 'pill-blue' : 'pill-purple';
       const unitLabel = getKpiUnitLabel(k);
-      const valueDisplay = k.valueMode === 'currency'
+      const valueDisplay = (!isPoint && k.valueMode === 'currency')
         ? fmtMoney(k.target, esc(k.currency) + ' ')
         : k.target + (unitLabel ? ' ' + esc(unitLabel) : '');
       const assignee = staffList.find(function(u) { return u.id === k.assigneeId; });
@@ -4539,7 +4626,7 @@ function renderKpiTable() {
       const actual = Math.round(calcKpiActual(k, ym) * 100) / 100;
       const pct = k.target > 0 ? Math.round(actual / k.target * 100) : 0;
       const pctClass = pct >= 100 ? 'pill-green' : pct >= 70 ? 'pill-orange' : 'pill-red';
-      const actualDisplay = k.valueMode === 'currency'
+      const actualDisplay = (!isPoint && k.valueMode === 'currency')
         ? fmtMoney(actual, esc(k.currency) + ' ')
         : actual + (unitLabel ? ' ' + esc(unitLabel) : '');
       const progressBar = '<div style="background:#eee;border-radius:4px;height:6px;width:80px;display:inline-block;vertical-align:middle;margin-right:4px;">' +
@@ -4551,9 +4638,13 @@ function renderKpiTable() {
         ? '<button class="btn-edit" onclick="editKpi(\'' + esc(k.id) + '\')"><i class="fas fa-edit"></i></button> ' +
           '<button class="btn-delete" onclick="deleteKpi(\'' + esc(k.id) + '\')"><i class="fas fa-trash"></i></button>'
         : '<span style="color:#bbb;font-size:.75rem;">View only</span>';
+      var modePill = isPoint
+        ? '<span class="pill pill-purple"><i class="fas fa-star"></i> Point</span>'
+        : '<span class="pill pill-teal"><i class="fas fa-chart-bar"></i> Volume</span>';
       html += '<tr>' +
         '<td>' + rowNum + '</td>' +
         '<td>' + esc(k.name) + '</td>' +
+        '<td>' + modePill + '</td>' +
         '<td><span class="pill ' + typePill + '">' + esc(typeLabel) + '</span></td>' +
         '<td>' + forLabel + '<br><small style="color:#888;">' + assigneeName + '</small></td>' +
         '<td>' + valueDisplay + '</td>' +
