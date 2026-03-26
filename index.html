@@ -1091,9 +1091,9 @@
           </div>
           <div class="filter-bar" style="padding:8px 0;">
             <div class="filter-group" style="flex:1;max-width:340px;">
-              <label class="filter-label"><i class="fas fa-magnifying-glass"></i> Search</label>
-              <input type="text" class="form-input" id="tu-search" placeholder="Search by name or phone…" oninput="renderTopUpTable()" onkeydown="if(event.key==='Enter')renderTopUpTable(true)" />
+              <input type="text" class="form-input" id="tu-search" placeholder="Search by name or phone…" onkeydown="if(event.key==='Enter')renderTopUpTable(true)" />
             </div>
+            <button class="btn btn-primary" onclick="renderTopUpTable(true)"><i class="fas fa-magnifying-glass"></i> Search</button>
             <button class="btn btn-outline" onclick="document.getElementById('tu-search').value='';renderTopUpTable()"><i class="fas fa-xmark"></i> Clear</button>
           </div>
           <div id="topup-expiry-notice"></div>
