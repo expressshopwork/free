@@ -3012,12 +3012,25 @@ function renderTopUpTable() {
     return;
   }
   const tuSearchVal = (rv('tu-search') || '').toLowerCase().trim();
-  const tuList = tuSearchVal
+  const tuFiltered = tuSearchVal
     ? baseTopUpList.filter(function(c) {
         return (c.name || '').toLowerCase().includes(tuSearchVal) ||
                (c.phone || '').toLowerCase().includes(tuSearchVal);
       })
     : baseTopUpList;
+  // Sort by expiry date ascending: soonest-to-expire (including already-expired) at top,
+  // records without an expiry date below, terminated records at the very bottom.
+  const tuList = tuFiltered.slice().sort(function(a, b) {
+    const isTermA = (a.tuStatus === 'terminate');
+    const isTermB = (b.tuStatus === 'terminate');
+    if (isTermA !== isTermB) return isTermA ? 1 : -1;
+    const expA = parseLocalDate(a.endDate);
+    const expB = parseLocalDate(b.endDate);
+    if (!expA && !expB) return 0;
+    if (!expA) return 1;
+    if (!expB) return -1;
+    return expA - expB;
+  });
   if (!tuList.length) {
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:#999;"><i class="fas fa-coins" style="font-size:2rem;display:block;margin-bottom:8px;"></i>No results found</td></tr>';
     return;
