@@ -782,6 +782,7 @@ function navigateTo(page, btn) {
     sale: 'Sale',
     'sale-tracking': 'Sale Tracking',
     kpi: 'KPI Setting',
+    'kpi-tracker': 'KPI Tracker',
     customer: 'Customer',
     settings: 'Settings',
     'inv-sale-stock': 'Inventory – Sale Stock',
@@ -796,6 +797,7 @@ function navigateTo(page, btn) {
   if (page === 'dashboard') renderDashboard();
   if (page === 'promotionPage') renderPromotionCards();
   if (page === 'kpi') { initKpiMonthPicker(); renderKpiTable(); }
+  if (page === 'kpi-tracker') { if (typeof initKpiTracker === 'function') initKpiTracker(); }
   if (page === 'sale-tracking') { initSaleTracking(); }
   if (page === 'deposit') { renderDepositTable(); updateDepositKpis(); }
   if (page === 'sale') { renderItemChips(); applyReportFilters(); }
@@ -936,6 +938,14 @@ function openSettingsMenu(el) {
   navigateTo('settings', null);
   switchSettingsTab('permission');
   setActiveSubItem(el);
+}
+
+function openKpiTrackerTab(tab, el) {
+  navigateTo('kpi-tracker', null);
+  setActiveSubItem(el);
+  if (typeof kpitSwitchTab === 'function') {
+    setTimeout(function () { kpitSwitchTab(tab); }, 0);
+  }
 }
 
 function setActiveSubItem(el) {
