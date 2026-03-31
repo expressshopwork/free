@@ -1,0 +1,498 @@
+/* ============================================================
+   KPI Tracker — kpi.css
+   ============================================================ */
+
+/* ── Page Tabs ─────────────────────────────────────────────── */
+.kpit-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 18px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: var(--shadow-card);
+  flex-wrap: wrap;
+}
+.kpit-tab {
+  flex: 1 1 auto;
+  min-width: 120px;
+  padding: 9px 18px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  font-size: .85rem;
+  font-weight: 600;
+  color: #555;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+.kpit-tab:hover { background: #f0f2f5; color: var(--color-primary); }
+.kpit-tab.active { background: var(--color-primary); color: #fff; }
+
+/* ── Sub-pages ──────────────────────────────────────────────── */
+.kpit-subpage { display: none; }
+.kpit-subpage.active { display: block; }
+
+/* ── Section card ───────────────────────────────────────────── */
+.kpit-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  padding: 20px 22px;
+  margin-bottom: 18px;
+}
+.kpit-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.kpit-card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Daily Entry Form ───────────────────────────────────────── */
+.kpit-form-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.kpit-form-group {
+  flex: 1 1 160px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.kpit-form-group label {
+  font-size: .76rem;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.kpit-form-group input,
+.kpit-form-group select {
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  font-size: .88rem;
+  font-family: inherit;
+  background: #fff;
+  color: var(--color-text);
+  transition: border-color .15s;
+  width: 100%;
+}
+.kpit-form-group input:focus,
+.kpit-form-group select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+/* ── Activity Table ─────────────────────────────────────────── */
+.kpit-activity-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .855rem;
+}
+.kpit-activity-table th {
+  background: #f5f7fa;
+  padding: 8px 10px;
+  text-align: left;
+  font-weight: 700;
+  font-size: .76rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: #666;
+  border-bottom: 2px solid #e8eaf0;
+  white-space: nowrap;
+}
+.kpit-activity-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: middle;
+}
+.kpit-activity-table tr:last-child td { border-bottom: none; }
+.kpit-activity-table tr:hover td { background: #fafbfc; }
+.kpit-group-header td {
+  background: #f0f4f8;
+  font-weight: 700;
+  color: var(--color-primary);
+  font-size: .78rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  padding: 6px 10px;
+}
+.kpit-qty-input {
+  width: 110px;
+  padding: 5px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: .85rem;
+  font-family: inherit;
+  text-align: right;
+}
+.kpit-qty-input:focus { outline: none; border-color: var(--color-primary); }
+.kpit-pts-cell {
+  font-weight: 700;
+  color: var(--color-primary);
+  text-align: right;
+  white-space: nowrap;
+}
+.kpit-pts-rate {
+  font-size: .72rem;
+  color: #999;
+  font-weight: 400;
+  margin-left: 3px;
+}
+
+/* Daily total row */
+.kpit-total-row {
+  background: var(--color-primary-light) !important;
+  font-weight: 700;
+}
+.kpit-total-row td { border-top: 2px solid var(--color-primary-mid) !important; }
+
+/* ── Progress / Tier Section ────────────────────────────────── */
+.kpit-tier-bar-wrap {
+  position: relative;
+  height: 20px;
+  background: #e8eaf0;
+  border-radius: 10px;
+  overflow: visible;
+  margin: 16px 0 28px;
+}
+.kpit-tier-bar-fill {
+  height: 100%;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #ffc107, #4caf50);
+  transition: width .5s ease;
+  max-width: 100%;
+}
+.kpit-tier-marker {
+  position: absolute;
+  top: -6px;
+  width: 2px;
+  height: 32px;
+  background: #333;
+  transform: translateX(-50%);
+}
+.kpit-tier-marker-label {
+  position: absolute;
+  top: 30px;
+  transform: translateX(-50%);
+  font-size: .68rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: #555;
+}
+
+/* Tier badges */
+.kpit-tier-badges {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.kpit-tier-badge {
+  flex: 1 1 100px;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border: 2px solid transparent;
+  transition: transform .15s, border-color .15s;
+}
+.kpit-tier-badge.achieved { border-color: currentColor; transform: translateY(-2px); }
+.kpit-tier-badge.kpit-min  { background: #fff8e1; color: #f57f17; }
+.kpit-tier-badge.kpit-gate { background: #e8f5e9; color: #388e3c; }
+.kpit-tier-badge.kpit-otb  { background: #e3f2fd; color: #1565c0; }
+.kpit-tier-badge.kpit-oab  { background: #f3e5f5; color: #7b1fa2; }
+.kpit-tier-badge .tier-name  { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.kpit-tier-badge .tier-pts   { font-size: 1.15rem; font-weight: 800; line-height: 1.1; }
+.kpit-tier-badge .tier-pay   { font-size: .78rem; font-weight: 600; opacity: .8; }
+.kpit-tier-badge .tier-check { font-size: .8rem; margin-top: 2px; }
+
+/* Summary stats */
+.kpit-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.kpit-stat-card {
+  background: #f5f7fa;
+  border-radius: 10px;
+  padding: 14px 16px;
+  text-align: center;
+}
+.kpit-stat-card .stat-label {
+  font-size: .72rem;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-bottom: 4px;
+}
+.kpit-stat-card .stat-value {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--color-text);
+  line-height: 1.1;
+}
+.kpit-stat-card .stat-sub {
+  font-size: .72rem;
+  color: #999;
+  margin-top: 2px;
+}
+
+/* ── Report Table ───────────────────────────────────────────── */
+.kpit-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .84rem;
+}
+.kpit-report-table th {
+  background: #f5f7fa;
+  padding: 8px 10px;
+  text-align: left;
+  font-weight: 700;
+  font-size: .74rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: #666;
+  border-bottom: 2px solid #e8eaf0;
+  white-space: nowrap;
+}
+.kpit-report-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: top;
+}
+.kpit-report-table tr:last-child td { border-bottom: none; }
+.kpit-report-table tr:hover td { background: #fafbfc; }
+.kpit-report-table .pts-cell {
+  font-weight: 700;
+  color: var(--color-primary);
+  text-align: right;
+}
+.kpit-report-table .date-cell { white-space: nowrap; font-weight: 600; }
+.kpit-report-table .cum-cell  { text-align: right; color: #555; }
+
+/* ── Settings Page ──────────────────────────────────────────── */
+.kpit-settings-section { margin-bottom: 24px; }
+.kpit-settings-section h4 {
+  font-size: .82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--color-primary);
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--color-primary-mid);
+}
+
+.kpit-settings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .855rem;
+}
+.kpit-settings-table th {
+  background: #f5f7fa;
+  padding: 7px 10px;
+  text-align: left;
+  font-weight: 700;
+  font-size: .74rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: #666;
+  border-bottom: 2px solid #e8eaf0;
+}
+.kpit-settings-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: middle;
+}
+.kpit-settings-table tr:last-child td { border-bottom: none; }
+.kpit-settings-table input[type="number"],
+.kpit-settings-table input[type="text"] {
+  padding: 4px 7px;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  font-size: .84rem;
+  font-family: inherit;
+  width: 90px;
+  text-align: right;
+}
+.kpit-settings-table input:focus { outline: none; border-color: var(--color-primary); }
+
+/* Toggle switch */
+.kpit-toggle {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  display: inline-block;
+}
+.kpit-toggle input { opacity: 0; width: 0; height: 0; }
+.kpit-toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: #ccc;
+  border-radius: 20px;
+  transition: background .2s;
+  cursor: pointer;
+}
+.kpit-toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  left: 3px;
+  top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform .2s;
+}
+.kpit-toggle input:checked + .kpit-toggle-slider { background: var(--color-primary); }
+.kpit-toggle input:checked + .kpit-toggle-slider::before { transform: translateX(16px); }
+
+/* Incentive grid */
+.kpit-incentive-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* ── Estimated payment highlight ────────────────────────────── */
+.kpit-payment-box {
+  background: linear-gradient(135deg, #1B7D3D 0%, #2E7D32 100%);
+  color: #fff;
+  border-radius: 14px;
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.kpit-payment-box .pay-label { font-size: .82rem; font-weight: 600; opacity: .85; margin-bottom: 3px; }
+.kpit-payment-box .pay-amount { font-size: 2.2rem; font-weight: 900; line-height: 1; }
+.kpit-payment-box .pay-tier { font-size: .78rem; opacity: .75; margin-top: 4px; }
+.kpit-payment-box .pay-right { text-align: right; }
+.kpit-payment-box .pay-pts { font-size: 1rem; font-weight: 700; }
+.kpit-payment-box .pay-next { font-size: .78rem; opacity: .8; margin-top: 4px; }
+
+/* ── Chart canvas wrapper ───────────────────────────────────── */
+.kpit-chart-wrap {
+  position: relative;
+  height: 220px;
+}
+
+/* ── Staff selector with avatar ─────────────────────────────── */
+.kpit-staff-search {
+  position: relative;
+}
+.kpit-staff-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.12);
+  z-index: 200;
+  max-height: 220px;
+  overflow-y: auto;
+  display: none;
+}
+.kpit-staff-dropdown.open { display: block; }
+.kpit-staff-opt {
+  padding: 9px 12px;
+  cursor: pointer;
+  font-size: .86rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background .12s;
+}
+.kpit-staff-opt:hover { background: #f0f4f8; }
+.kpit-staff-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 700;
+  font-size: .78rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ── Entry history mini-chips ───────────────────────────────── */
+.kpit-day-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.kpit-day-chip {
+  padding: 4px 10px;
+  background: #f0f4f8;
+  border-radius: 20px;
+  font-size: .76rem;
+  font-weight: 600;
+  color: #555;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.kpit-day-chip:hover, .kpit-day-chip.selected {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+/* ── Empty state ────────────────────────────────────────────── */
+.kpit-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #bbb;
+}
+.kpit-empty i { font-size: 2.4rem; display: block; margin-bottom: 10px; }
+.kpit-empty p { font-size: .88rem; }
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .kpit-stats-row { grid-template-columns: repeat(2, 1fr); }
+  .kpit-incentive-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .kpit-stats-row { grid-template-columns: 1fr 1fr; }
+  .kpit-tier-badges { flex-direction: row; }
+  .kpit-tier-badge { flex: 1 1 40%; }
+  .kpit-chart-wrap { height: 180px; }
+  .kpit-tabs { gap: 4px; }
+  .kpit-tab { font-size: .78rem; padding: 8px 10px; }
+  .kpit-form-group { flex: 1 1 100%; }
+  .kpit-payment-box { flex-direction: column; text-align: center; }
+  .kpit-payment-box .pay-right { text-align: center; }
+}
+@media (max-width: 420px) {
+  .kpit-stats-row { grid-template-columns: 1fr; }
+  .kpit-activity-table .kpit-qty-input { width: 80px; }
+}

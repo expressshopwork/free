@@ -20,6 +20,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.fullscreen/2.4.0/Control.FullScreen.min.js" crossorigin="anonymous"></script>
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="kpi.css" />
   <style>
     /* ── Professional overrides ── */
     :root {
@@ -467,6 +468,27 @@
         </li>
       </ul>
 
+      <!-- KPI Tracker (with submenu) -->
+      <li class="nav-item has-submenu" id="nav-kpi-tracker" onclick="toggleSubmenu('submenu-kpi-tracker', this)">
+        <i class="fas fa-medal nav-icon"></i>
+        <span class="nav-label">KPI Tracker</span>
+        <i class="fas fa-chevron-down nav-chevron"></i>
+      </li>
+      <ul class="submenu" id="submenu-kpi-tracker">
+        <li class="submenu-item" id="nav-kpit-entry" onclick="openKpiTrackerTab('entry', this)">
+          <i class="fas fa-pen-to-square submenu-icon"></i>
+          <span>Daily Entry</span>
+        </li>
+        <li class="submenu-item" id="nav-kpit-report" onclick="openKpiTrackerTab('report', this)">
+          <i class="fas fa-chart-line submenu-icon"></i>
+          <span>My Report</span>
+        </li>
+        <li class="submenu-item" id="nav-kpit-config" onclick="openKpiTrackerTab('config', this)">
+          <i class="fas fa-sliders submenu-icon"></i>
+          <span>KPI Settings</span>
+        </li>
+      </ul>
+
       <!-- Deposit (with submenu) -->
       <li class="nav-item has-submenu" id="nav-deposit" onclick="toggleSubmenu('submenu-deposit', this)">
         <i class="fas fa-vault nav-icon"></i>
@@ -835,6 +857,14 @@
             </table>
           </div>
         </div>
+      </section>
+
+      <!-- ========== KPI TRACKER PAGE ========== -->
+      <section class="page" id="page-kpi-tracker">
+        <div class="page-header">
+          <h2 class="page-header-title"><i class="fas fa-medal" style="color:#1B7D3D;margin-right:8px"></i>KPI Tracker</h2>
+        </div>
+        <div id="kpit-page-wrap"></div>
       </section>
 
       <!-- ========== DEPOSIT PAGE ========== -->
@@ -2594,5 +2624,6 @@
   <!-- END APP SHELL -->
 
   <script src="app.js"></script>
+  <script src="kpi.js"></script>
 </body>
 </html>
