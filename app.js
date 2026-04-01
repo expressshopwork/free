@@ -2328,7 +2328,7 @@ function calcKpiActual(kpi, ym) {
     var pointItems = kpi.pointItems || [];
     filtered.forEach(function(s) {
       pointItems.forEach(function(pi) {
-        actual += ((s.items && s.items[pi.itemId]) || 0) * pi.points;
+        actual += (Number(s.items && s.items[pi.itemId]) || 0) * (Number(pi.points) || 0);
       });
     });
     return actual;
@@ -4435,7 +4435,7 @@ function getKpiPointItems() {
   var inputs = $$('#kpi-point-items-list .kpi-point-input');
   var result = [];
   inputs.forEach(function(input) {
-    var pts = parseFloat(input.value) || 0;
+    var pts = parseInt(input.value, 10) || 0;
     if (pts > 0) result.push({ itemId: input.getAttribute('data-item-id'), points: pts });
   });
   return result;
