@@ -1579,6 +1579,12 @@ function deleteSale(id) {
 function appendDailySale(record) {
   if (!GS_URL || !record) return;
   var flat = normalizeRowForSheet(record);
+  // Add top-level revenue and kpiPoints fields so Google Sheets shows readable numbers
+  // instead of the JSON-stringified dollarItems object.
+  flat.revenue = (record.dollarItems && record.dollarItems[ITEM_ID_REVENUE])
+    ? record.dollarItems[ITEM_ID_REVENUE]
+    : 0;
+  flat.kpiPoints = record.kpiPoints || 0;
   _gsPost({ sheet: 'DailySale', action: 'append', data: flat })
     .catch(function(err) { console.warn('DailySale append error:', err); });
 }
@@ -1773,8 +1779,9 @@ function updateSaleKpis() {
 }
 
 function renderSaleTable() {
-  const table = g('sale-table');
-  if (!table) return;
+  var unitTable  = g('sale-unit-table');
+  var pointTable = g('sale-point-table');
+  if (!unitTable && !pointTable) return;
 
   // Role-based base records for filter dropdowns
   const baseRecords = getSaleBaseRecords();
@@ -1808,100 +1815,112 @@ function renderSaleTable() {
   }
 
   const data = filteredSales;
+  const unitData  = data.filter(function(s) { return s.transactionType !== 'point'; });
+  const pointData = data.filter(function(s) { return s.transactionType === 'point'; });
 
-  if (!data.length) {
-    table.innerHTML = '<thead></thead><tbody><tr><td colspan="20" style="text-align:center;padding:40px;color:#999;"><i class="fas fa-inbox" style="font-size:2rem;display:block;margin-bottom:8px;"></i>No records found</td></tr></tbody>';
-    updateTotalBar(0, 0, 0);
-    return;
-  }
-
-  // Separate unit-based and point-based records
-  var unitData  = data.filter(function(s) { return s.transactionType !== 'point'; });
-  var pointData = data.filter(function(s) { return s.transactionType === 'point'; });
-
-  // Always show all active item columns regardless of whether they have data
-  const unitItems = itemCatalogue.filter(function(x) { return x.group === 'unit' && x.status === 'active'; });
+  const unitItems   = itemCatalogue.filter(function(x) { return x.group === 'unit'   && x.status === 'active'; });
   const dollarItems = itemCatalogue.filter(function(x) { return x.group === 'dollar' && x.status === 'active' && x.id !== ITEM_ID_REVENUE; });
-
-  let headerRow1 = '<tr><th rowspan="2">Type</th><th rowspan="2">Agent</th><th rowspan="2">Branch</th><th rowspan="2">Submit Date</th>';
-  if (unitItems.length) headerRow1 += '<th colspan="' + unitItems.length + '" class="th-group-unit">Unit Group</th>';
-  if (dollarItems.length) headerRow1 += '<th colspan="' + dollarItems.length + '" class="th-group-dollar">Dollar Group</th>';
-  headerRow1 += '<th rowspan="2" class="td-buy-number">Revenue / Points</th><th rowspan="2">Remark / Service</th><th rowspan="2">Actions</th></tr>';
-
-  let headerRow2 = '<tr>';
-  unitItems.forEach(function(item) { headerRow2 += '<th class="th-unit">' + esc(item.shortcut || item.name) + '</th>'; });
-  dollarItems.forEach(function(item) { headerRow2 += '<th class="th-dollar">' + esc(item.shortcut || item.name) + '</th>'; });
-  headerRow2 += '</tr>';
 
   let totalUnits = 0, totalDollar = 0, totalPoints = 0;
 
-  const bodyRows = data.map(function(s) {
-    const canEdit = canModifySaleRecord(s);
-    const avIdx = Math.abs((s.agent.charCodeAt(0) || 0)) % 8;
-    const submitDate = dateOf(s.submittedAt) || dateOf(s.date);
-
-    var typeBadge, revCell, remarkCell;
-    var unitCells, dollarCells;
-
-    if (s.transactionType === 'point') {
-      // Point-Based row
-      var svc = KPI_SERVICES.find(function(x) { return x.id === s.kpiService; });
-      var svcName = svc ? svc.name + ' (' + svc.category + ')' : (s.kpiService || '');
-      var pts = parseFloat(s.kpiPoints) || 0;
-      totalPoints += pts;
-      typeBadge = '<span class="type-badge type-badge--point"><i class="fas fa-star"></i> Point</span>';
-      unitCells = unitItems.map(function() { return '<td class="td-unit" style="color:#ccc;">—</td>'; }).join('');
-      dollarCells = dollarItems.map(function() { return '<td class="td-dollar" style="color:#ccc;">—</td>'; }).join('');
-      revCell = '<td class="td-buy-number"><span style="color:#FF9800;font-weight:600;">' +
-        (pts % 1 === 0 ? pts : pts.toFixed(2)) + ' pts</span>' +
-        (s.kpiAmount ? '<br><small style="color:#888;">$' + parseFloat(s.kpiAmount).toFixed(2) + '</small>' : '') +
-        '</td>';
-      remarkCell = '<td style="font-size:0.82rem;">' +
-        '<span style="color:#555;">' + esc(svcName) + '</span>' +
-        (s.customerPhone ? '<br><small style="color:#888;"><i class="fas fa-phone"></i> ' + esc(s.customerPhone) + '</small>' : '') +
-        (s.note ? '<br><small style="color:#aaa;">' + esc(s.note) + '</small>' : '') +
-        '</td>';
+  // ---- Unit-Based Performance Table ----
+  if (unitTable) {
+    if (!unitData.length) {
+      unitTable.innerHTML = '<thead></thead><tbody><tr><td colspan="20" style="text-align:center;padding:30px;color:#999;"><i class="fas fa-inbox" style="font-size:1.5rem;display:block;margin-bottom:8px;"></i>No unit-based records found</td></tr></tbody>';
     } else {
-      // Unit-Based row
-      typeBadge = '<span class="type-badge type-badge--unit"><i class="fas fa-boxes-stacked"></i> Unit</span>';
-      unitCells = unitItems.map(function(item) {
-        const qty = s.items && s.items[item.id] ? s.items[item.id] : 0;
-        totalUnits += qty;
-        return '<td class="td-unit">' + (qty || '') + '</td>';
+      let uHeader1 = '<tr><th rowspan="2">Agent</th><th rowspan="2">Branch</th><th rowspan="2">Submit Date</th>';
+      if (unitItems.length)   uHeader1 += '<th colspan="' + unitItems.length   + '" class="th-group-unit">Unit Group</th>';
+      if (dollarItems.length) uHeader1 += '<th colspan="' + dollarItems.length + '" class="th-group-dollar">Dollar Group</th>';
+      uHeader1 += '<th rowspan="2" class="td-buy-number">Revenue</th><th rowspan="2">Remark</th><th rowspan="2">Actions</th></tr>';
+
+      let uHeader2 = '<tr>';
+      unitItems.forEach(function(item)   { uHeader2 += '<th class="th-unit">'   + esc(item.shortcut || item.name) + '</th>'; });
+      dollarItems.forEach(function(item) { uHeader2 += '<th class="th-dollar">' + esc(item.shortcut || item.name) + '</th>'; });
+      uHeader2 += '</tr>';
+
+      const uRows = unitData.map(function(s) {
+        const canEdit    = canModifySaleRecord(s);
+        const avIdx      = Math.abs((s.agent.charCodeAt(0) || 0)) % 8;
+        const submitDate = dateOf(s.submittedAt) || dateOf(s.date);
+
+        const unitCells = unitItems.map(function(item) {
+          const qty = s.items && s.items[item.id] ? s.items[item.id] : 0;
+          totalUnits += qty;
+          return '<td class="td-unit">' + (qty || '') + '</td>';
+        }).join('');
+
+        const dCells = dollarItems.map(function(item) {
+          const amt = s.dollarItems && s.dollarItems[item.id] ? s.dollarItems[item.id] : 0;
+          totalDollar += amt;
+          return '<td class="td-dollar">' + (amt > 0 ? fmtMoney(amt, esc(item.currency) + ' ') : '') + '</td>';
+        }).join('');
+
+        const saleRev  = s.dollarItems && s.dollarItems[ITEM_ID_REVENUE] ? s.dollarItems[ITEM_ID_REVENUE] : 0;
+        const revCell  = '<td class="td-buy-number">' + fmtMoney(saleRev) + '</td>';
+        const remCell  = '<td style="color:#888;font-size:0.8rem;">' + esc(s.note || s.remark || '') + '</td>';
+
+        return '<tr>' +
+          '<td><div class="name-cell"><span class="avatar-circle av-' + avIdx + '" style="width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;color:#fff;margin-right:8px;">' + esc(ini(s.agent)) + '</span>' + esc(s.agent) + '</div></td>' +
+          '<td>' + esc(s.branch) + '</td>' +
+          '<td style="white-space:nowrap;font-size:0.82rem;color:#555;">' + esc(submitDate) + '</td>' +
+          unitCells + dCells + revCell + remCell +
+          '<td style="white-space:nowrap;">' +
+            (canEdit ? '<button class="btn-edit" onclick="editSale(\'' + esc(s.id) + '\')"><i class="fas fa-edit"></i></button> ' : '') +
+            (canEdit ? '<button class="btn-delete" onclick="deleteSale(\'' + esc(s.id) + '\')"><i class="fas fa-trash"></i></button>' : '') +
+          '</td></tr>';
       }).join('');
-      dollarCells = dollarItems.map(function(item) {
-        const amt = s.dollarItems && s.dollarItems[item.id] ? s.dollarItems[item.id] : 0;
-        totalDollar += amt;
-        return '<td class="td-dollar">' + (amt > 0 ? fmtMoney(amt, esc(item.currency) + ' ') : '') + '</td>';
-      }).join('');
-      const saleRev = s.dollarItems && s.dollarItems[ITEM_ID_REVENUE] ? s.dollarItems[ITEM_ID_REVENUE] : 0;
-      revCell = '<td class="td-buy-number">' + fmtMoney(saleRev) + '</td>';
-      remarkCell = '<td style="color:#888;font-size:0.8rem;">' + esc(s.note || s.remark || '') + '</td>';
+
+      const uThead = unitTable.querySelector('thead') || document.createElement('thead');
+      const uTbody = unitTable.querySelector('tbody') || document.createElement('tbody');
+      uThead.innerHTML = uHeader1 + uHeader2;
+      uTbody.innerHTML = uRows;
+      if (!unitTable.contains(uTbody)) unitTable.appendChild(uTbody);
+      if (unitTable.firstChild !== uThead) unitTable.insertBefore(uThead, unitTable.firstChild);
     }
+  }
 
-    return '<tr>' +
-      '<td>' + typeBadge + '</td>' +
-      '<td><div class="name-cell"><span class="avatar-circle av-' + avIdx + '" style="width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;color:#fff;margin-right:8px;">' + esc(ini(s.agent)) + '</span>' + esc(s.agent) + '</div></td>' +
-      '<td>' + esc(s.branch) + '</td>' +
-      '<td style="white-space:nowrap;font-size:0.82rem;color:#555;">' + esc(submitDate) + '</td>' +
-      unitCells +
-      dollarCells +
-      revCell +
-      remarkCell +
-      '<td style="white-space:nowrap;">' +
-        (canEdit ? '<button class="btn-edit" onclick="editSale(\'' + esc(s.id) + '\')"><i class="fas fa-edit"></i></button> ' : '') +
-        (canEdit ? '<button class="btn-delete" onclick="deleteSale(\'' + esc(s.id) + '\')"><i class="fas fa-trash"></i></button>' : '') +
-      '</td>' +
-      '</tr>';
-  }).join('');
+  // ---- Point-Based Performance Table ----
+  if (pointTable) {
+    if (!pointData.length) {
+      pointTable.innerHTML = '<thead></thead><tbody><tr><td colspan="9" style="text-align:center;padding:30px;color:#999;"><i class="fas fa-inbox" style="font-size:1.5rem;display:block;margin-bottom:8px;"></i>No point-based records found</td></tr></tbody>';
+    } else {
+      const pHeader = '<tr>' +
+        '<th>Agent</th><th>Branch</th><th>Submit Date</th><th>Service</th>' +
+        '<th style="color:#FF9800;">Points</th><th>Amount</th><th>Phone</th>' +
+        '<th>Remark</th><th>Actions</th></tr>';
 
-  const thead = table.querySelector('thead') || document.createElement('thead');
-  const tbody = table.querySelector('tbody') || document.createElement('tbody');
-  thead.innerHTML = headerRow1 + headerRow2;
-  tbody.innerHTML = bodyRows;
-  if (!table.contains(tbody)) table.appendChild(tbody);
-  // Ensure thead is always the first child in the DOM for correct sticky-header and display ordering
-  if (table.firstChild !== thead) table.insertBefore(thead, table.firstChild);
+      const pRows = pointData.map(function(s) {
+        const canEdit    = canModifySaleRecord(s);
+        const avIdx      = Math.abs((s.agent.charCodeAt(0) || 0)) % 8;
+        const submitDate = dateOf(s.submittedAt) || dateOf(s.date);
+        var svc     = KPI_SERVICES.find(function(x) { return x.id === s.kpiService; });
+        var svcName = svc ? svc.name + ' (' + svc.category + ')' : (s.kpiService || '');
+        var pts     = parseFloat(s.kpiPoints) || 0;
+        totalPoints += pts;
+
+        return '<tr>' +
+          '<td><div class="name-cell"><span class="avatar-circle av-' + avIdx + '" style="width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;color:#fff;margin-right:8px;">' + esc(ini(s.agent)) + '</span>' + esc(s.agent) + '</div></td>' +
+          '<td>' + esc(s.branch) + '</td>' +
+          '<td style="white-space:nowrap;font-size:0.82rem;color:#555;">' + esc(submitDate) + '</td>' +
+          '<td style="font-size:0.85rem;color:#555;">' + esc(svcName) + '</td>' +
+          '<td style="text-align:center;"><span style="color:#FF9800;font-weight:700;">' + (pts % 1 === 0 ? pts : pts.toFixed(2)) + '</span> <small style="color:#aaa;">pts</small></td>' +
+          '<td style="text-align:right;">' + (s.kpiAmount ? '<span style="color:#388e3c;">' + fmtMoney(parseFloat(s.kpiAmount)) + '</span>' : '') + '</td>' +
+          '<td style="font-size:0.82rem;color:#888;">' + (s.customerPhone ? '<i class="fas fa-phone" style="font-size:0.75rem;margin-right:4px;"></i>' + esc(s.customerPhone) : '') + '</td>' +
+          '<td style="color:#888;font-size:0.8rem;">' + esc(s.note || s.remark || '') + '</td>' +
+          '<td style="white-space:nowrap;">' +
+            (canEdit ? '<button class="btn-edit" onclick="editSale(\'' + esc(s.id) + '\')"><i class="fas fa-edit"></i></button> ' : '') +
+            (canEdit ? '<button class="btn-delete" onclick="deleteSale(\'' + esc(s.id) + '\')"><i class="fas fa-trash"></i></button>' : '') +
+          '</td></tr>';
+      }).join('');
+
+      const pThead = pointTable.querySelector('thead') || document.createElement('thead');
+      const pTbody = pointTable.querySelector('tbody') || document.createElement('tbody');
+      pThead.innerHTML = pHeader;
+      pTbody.innerHTML = pRows;
+      if (!pointTable.contains(pTbody)) pointTable.appendChild(pTbody);
+      if (pointTable.firstChild !== pThead) pointTable.insertBefore(pThead, pointTable.firstChild);
+    }
+  }
 
   updateTotalBar(totalUnits, totalDollar, totalPoints);
 }
@@ -3880,12 +3899,22 @@ function _depCreditAmt(deposit) {
   return deposit.creditAmount !== undefined ? deposit.creditAmount : (deposit.credit || 0);
 }
 
-// Normalizes a point-based sale record after reading from Google Sheets or
-// localStorage, ensuring numeric fields (kpiAmount, kpiPoints) are stored as
-// numbers rather than the strings that the Sheets API returns for numeric cells.
+// Normalizes a sale record after reading from Google Sheets or localStorage,
+// ensuring object fields (items, dollarItems) are parsed back from the JSON
+// strings that the Sheets API stores them as, and that numeric fields
+// (kpiAmount, kpiPoints) are stored as numbers.
 function normalizeSaleRecord(s) {
   if (!s || typeof s !== 'object') return s;
   var out = Object.assign({}, s);
+  // Parse items and dollarItems back from JSON strings (when loaded from Google Sheets)
+  ['items', 'dollarItems'].forEach(function(key) {
+    if (typeof out[key] === 'string') {
+      try { out[key] = JSON.parse(out[key]); } catch (e) { console.warn('normalizeSaleRecord: failed to parse ' + key + ':', out[key], e); out[key] = {}; }
+    }
+    if (!out[key] || typeof out[key] !== 'object' || Array.isArray(out[key])) {
+      out[key] = {};
+    }
+  });
   if (out.kpiAmount !== undefined && out.kpiAmount !== '') {
     out.kpiAmount = parseFloat(out.kpiAmount) || 0;
   }
