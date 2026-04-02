@@ -9,6 +9,7 @@ let currentRole = 'admin'; // 'admin', 'supervisor', 'user'
 let currentUser = null;
 let currentPage = 'dashboard';
 let currentSaleTab = 'report';
+let currentSaleModalType = 'unit'; // 'unit' or 'point'
 let currentCustomerTab = 'new-customer';
 let currentSettingsTab = 'permission';
 let currentCoverageTab = 'smart-home';
@@ -74,6 +75,70 @@ const UNIT_SALE_ITEMS = [
 ];
 
 const BRANCHES = ['Phnom Penh', 'Siem Reap', 'Battambang', 'Sihanoukville', 'Kampong Cham', 'Express_Tramkak'];
+
+// Smart Shop branches (Cambodia)
+const SMART_SHOPS = [
+  'Smart Shop Phnom Penh Central','Smart Shop Toul Kork','Smart Shop Boeung Keng Kang',
+  'Smart Shop Tuol Sangke','Smart Shop Chbar Ampov','Smart Shop Meanchey',
+  'Smart Shop Dangkor','Smart Shop Russey Keo','Smart Shop Prek Pnov',
+  'Smart Shop Pur Senchey','Smart Shop Sensok','Smart Shop Chraoy Chongvar',
+  'Smart Shop Siem Reap Central','Smart Shop Siem Reap Airport','Smart Shop Svay Dongkum',
+  'Smart Shop Battambang Central','Smart Shop Battambang Market','Smart Shop Pailin',
+  'Smart Shop Sihanoukville Central','Smart Shop Sihanoukville Beach','Smart Shop Kampot',
+  'Smart Shop Kep','Smart Shop Kampong Cham Central','Smart Shop Kampong Cham Market',
+  'Smart Shop Kampong Thom','Smart Shop Kampong Chhnang','Smart Shop Kampong Speu',
+  'Smart Shop Kandal','Smart Shop Ta Khmau','Smart Shop Takeo',
+  'Smart Shop Svay Rieng','Smart Shop Prey Veng','Smart Shop Kratié',
+  'Smart Shop Stung Treng','Smart Shop Ratanakiri','Smart Shop Mondulkiri',
+  'Smart Shop Pursat','Smart Shop Koh Kong','Smart Shop Preah Vihear',
+  'Smart Shop Oddor Meanchey','Smart Shop Banteay Meanchey','Smart Shop Poipet',
+  'Smart Shop Sisophon','Smart Shop Preah Sihanouk','Smart Shop Tboung Khmum',
+  'Smart Shop Kep City','Smart Shop Kampong Leaeng','Smart Shop Kampong Tralach',
+  'Smart Shop Chamkar Mon','Smart Shop Daun Penh','Smart Shop 7 Makara',
+  'Smart Shop Tuol Kork 2','Smart Shop Prampi Makara','Smart Shop Ek Phnom',
+  'Smart Shop Banan','Smart Shop Sangke','Smart Shop Moung Ruessei',
+  'Smart Shop Thma Koul','Smart Shop Phnom Sruoch','Smart Shop Aoral',
+  'Smart Shop Oral','Smart Shop Basedth','Express_Tramkak'
+];
+
+// ── KPI Point-Based Services ──────────────────────────────────────────────
+const KPI_SERVICES = [
+  { id: 'ks1',  name: 'Gross Add',                  category: 'MBB Pre-Paid', rate: 1.0, addOn: 0 },
+  { id: 'ks2',  name: 'Change SIM',                 category: 'MBB Pre-Paid', rate: 1.0, addOn: 0 },
+  { id: 'ks3',  name: 'Pre-Paid sub Recharge',      category: 'MBB Pre-Paid', rate: 1.0, addOn: 0 },
+  { id: 'ks4',  name: 'SC Selling',                 category: 'MBB Pre-Paid', rate: 1.0, addOn: 0 },
+  { id: 'ks5',  name: 'Home Internet Gross Add',    category: 'FBB Home',     rate: 2.0, addOn: 0 },
+  { id: 'ks6',  name: 'FWBB Deposit / FTTx Signup', category: 'FBB Home',     rate: 2.0, addOn: 0 },
+  { id: 'ks7',  name: 'Home Internet Migration',    category: 'FBB Home',     rate: 2.0, addOn: 0 },
+  { id: 'ks8',  name: 'Home Internet Recharge',     category: 'FBB Home',     rate: 2.0, addOn: 0 },
+  { id: 'ks9',  name: 'SME New Sub Gross Add',      category: 'FBB SME',      rate: 2.0, addOn: 0 },
+  { id: 'ks10', name: 'SME Existing Recharge',      category: 'FBB SME',      rate: 2.0, addOn: 0 },
+  { id: 'ks11', name: 'ICT Solution',               category: 'MBB ICT',      rate: 2.0, addOn: 0 },
+  { id: 'ks12', name: 'Device Handset/Accessory',   category: 'Other',        rate: 0.5, addOn: 0 },
+  { id: 'ks13', name: 'eSIM',                       category: 'Other',        rate: 1.0, addOn: 2.0 },
+  { id: 'ks14', name: 'Smart NAS Download',         category: 'Other',        rate: 0.0, addOn: 2.0 },
+];
+
+// ── KPI Tier Thresholds ───────────────────────────────────────────────────
+const KPI_TIERS = {
+  agent:      { min: 800,  gate: 1000, otb: 1100, oab: 1300 },
+  supervisor: { min: 5600, gate: 7000, otb: 7500, oab: 8000 }
+};
+
+function calcKpiPoints(serviceId, amount) {
+  var svc = KPI_SERVICES.find(function(s) { return s.id === serviceId; });
+  if (!svc) return 0;
+  return (parseFloat(amount) || 0) * svc.rate + svc.addOn;
+}
+
+function getKpiTierLabel(points, role) {
+  var tiers = (role === 'supervisor') ? KPI_TIERS.supervisor : KPI_TIERS.agent;
+  if (points >= tiers.oab)  return { label: 'OAB',  color: '#4CAF50', rank: 4 };
+  if (points >= tiers.otb)  return { label: 'OTB',  color: '#2196F3', rank: 3 };
+  if (points >= tiers.gate) return { label: 'Gate', color: '#FF9800', rank: 2 };
+  if (points >= tiers.min)  return { label: 'Min',  color: '#9C27B0', rank: 1 };
+  return { label: 'Below Min', color: '#F44336', rank: 0 };
+}
 
 const SUPPORT_CONTACT = { email: 'support@smart5g.com', phone: '+855 23 123 456' };
 
@@ -643,7 +708,9 @@ function _onConfirmAction() {
 
 // Populate branch dropdowns
 function getBranches() {
-  return [...new Set(staffList.map(function(u) { return u.branch; }).filter(Boolean))].sort();
+  var fromStaff = [...new Set(staffList.map(function(u) { return u.branch; }).filter(Boolean))].sort();
+  // Merge staff branches with SMART_SHOPS to ensure all known shops are available
+  return [...new Set([...fromStaff, ...SMART_SHOPS])].sort();
 }
 
 function populateBranchSelects() {
@@ -781,6 +848,7 @@ function navigateTo(page, btn) {
     deposit: 'Deposit',
     sale: 'Sale',
     'sale-tracking': 'Sale Tracking',
+    performance: 'Performance Tracking',
     kpi: 'KPI Setting',
     customer: 'Customer',
     settings: 'Settings',
@@ -797,6 +865,7 @@ function navigateTo(page, btn) {
   if (page === 'promotionPage') renderPromotionCards();
   if (page === 'kpi') { initKpiMonthPicker(); renderKpiTable(); }
   if (page === 'sale-tracking') { initSaleTracking(); }
+  if (page === 'performance') { renderPerformancePage(); }
   if (page === 'deposit') { renderDepositTable(); updateDepositKpis(); }
   if (page === 'sale') { renderItemChips(); applyReportFilters(); }
   if (page === 'customer') {
@@ -1229,6 +1298,31 @@ function renderItemChips() {
 // ------------------------------------------------------------
 // New Sale Modal
 // ------------------------------------------------------------
+function switchSaleModalType(type) {
+  currentSaleModalType = type;
+  var unitBtn = g('sale-type-btn-unit');
+  var pointBtn = g('sale-type-btn-point');
+  var unitSection = g('sale-unit-section');
+  var pointSection = g('sale-point-section');
+  if (unitBtn) unitBtn.classList.toggle('active', type === 'unit');
+  if (pointBtn) pointBtn.classList.toggle('active', type === 'point');
+  if (unitSection) unitSection.style.display = (type === 'unit') ? '' : 'none';
+  if (pointSection) pointSection.style.display = (type === 'point') ? '' : 'none';
+  // Adjust required attributes
+  var kpiServiceSel = g('sale-kpi-service');
+  var kpiAmountInp = g('sale-kpi-amount');
+  if (kpiServiceSel) kpiServiceSel.required = (type === 'point');
+  if (kpiAmountInp) kpiAmountInp.required = (type === 'point');
+}
+
+function updateKpiPointPreview() {
+  var serviceId = rv('sale-kpi-service');
+  var amount = rv('sale-kpi-amount');
+  var pts = calcKpiPoints(serviceId, amount);
+  var el = g('kpi-points-value');
+  if (el) el.textContent = pts % 1 === 0 ? pts.toString() : pts.toFixed(2);
+}
+
 function openNewSaleModal(sale) {
   const form = g('form-newSale');
   if (form) form.reset();
@@ -1236,6 +1330,24 @@ function openNewSaleModal(sale) {
 
   const title = g('modal-newSale-title');
   const btn = g('sale-submit-btn');
+
+  // Populate KPI service dropdown
+  var kpiServiceSel = g('sale-kpi-service');
+  if (kpiServiceSel) {
+    var grouped = {};
+    KPI_SERVICES.forEach(function(s) {
+      if (!grouped[s.category]) grouped[s.category] = [];
+      grouped[s.category].push(s);
+    });
+    kpiServiceSel.innerHTML = '<option value="">Select service</option>' +
+      Object.keys(grouped).map(function(cat) {
+        return '<optgroup label="' + esc(cat) + '">' +
+          grouped[cat].map(function(s) {
+            return '<option value="' + esc(s.id) + '">' + esc(s.name) +
+              ' (×' + s.rate + (s.addOn ? ' +' + s.addOn : '') + ' pts)</option>';
+          }).join('') + '</optgroup>';
+      }).join('');
+  }
 
   const unitContainer = g('sale-unit-items');
   const dollarContainer = g('sale-dollar-items');
@@ -1282,6 +1394,10 @@ function openNewSaleModal(sale) {
 
   populateBranchSelects();
 
+  // Determine transaction type for this record
+  var editType = (sale && sale.transactionType === 'point') ? 'point' : 'unit';
+  switchSaleModalType(editType);
+
   if (sale) {
     if (title) title.textContent = 'Edit Sale';
     if (btn) btn.textContent = 'Update Sale';
@@ -1292,19 +1408,28 @@ function openNewSaleModal(sale) {
     g('sale-date').value = sale.date || '';
     g('sale-remark').value = sale.remark || sale.note || '';
 
-    if (sale.items) {
-      Object.keys(sale.items).forEach(function(iid) {
-        const inp = g('sic-' + iid);
-        if (inp) inp.value = sale.items[iid];
-      });
+    if (editType === 'point') {
+      if (kpiServiceSel) kpiServiceSel.value = sale.kpiService || '';
+      var kpiAmtInp = g('sale-kpi-amount');
+      if (kpiAmtInp) kpiAmtInp.value = sale.kpiAmount || '';
+      var kpiPhoneInp = g('sale-kpi-phone');
+      if (kpiPhoneInp) kpiPhoneInp.value = sale.customerPhone || '';
+      updateKpiPointPreview();
+    } else {
+      if (sale.items) {
+        Object.keys(sale.items).forEach(function(iid) {
+          const inp = g('sic-' + iid);
+          if (inp) inp.value = sale.items[iid];
+        });
+      }
+      if (sale.dollarItems) {
+        Object.keys(sale.dollarItems).forEach(function(iid) {
+          const inp = g('sic-' + iid);
+          if (inp) inp.value = sale.dollarItems[iid];
+        });
+      }
+      updateSaleRevenueTotal();
     }
-    if (sale.dollarItems) {
-      Object.keys(sale.dollarItems).forEach(function(iid) {
-        const inp = g('sic-' + iid);
-        if (inp) inp.value = sale.dollarItems[iid];
-      });
-    }
-    updateSaleRevenueTotal();
   } else {
     if (title) title.textContent = 'New Sale';
     if (btn) btn.textContent = 'Save Sale';
@@ -1331,26 +1456,63 @@ function submitSale(e) {
   if (!agent) { showAlert('Please enter agent name'); return; }
   if (!date) { showAlert('Please select date'); return; }
 
-  const items = {}, dollarItems = {};
-  let autoRevenue = 0;
-  UNIT_SALE_ITEMS.forEach(function(item) {
-    const inp = g('sic-' + item.id);
-    if (!inp) return;
-    const val = parseFloat(inp.value) || 0;
-    if (val > 0) items[item.id] = val;
-  });
-  DOLLAR_SALE_ITEMS.forEach(function(item) {
-    const inp = g('sic-' + item.id);
-    if (!inp) return;
-    const val = parseFloat(inp.value) || 0;
-    if (val > 0) dollarItems[item.id] = val;
-    autoRevenue += val;
-  });
-  if (autoRevenue > 0) dollarItems[ITEM_ID_REVENUE] = autoRevenue;
-
   const now = new Date().toISOString();
   const existingRecord = editId ? saleRecords.find(function(x) { return x.id === editId; }) : null;
-  const obj = { id: editId || uid(), agent: agent, branch: branch, date: date, submittedAt: (existingRecord && existingRecord.submittedAt) || now, note: note, items: items, dollarItems: dollarItems };
+  var obj;
+
+  if (currentSaleModalType === 'point') {
+    // Point-Based transaction
+    var kpiService = rv('sale-kpi-service');
+    var kpiAmount = parseFloat(rv('sale-kpi-amount')) || 0;
+    var customerPhone = rv('sale-kpi-phone');
+    if (!kpiService) { showAlert('Please select a service type'); return; }
+    if (kpiAmount <= 0) { showAlert('Please enter a valid amount'); return; }
+    var kpiPoints = calcKpiPoints(kpiService, kpiAmount);
+    obj = {
+      id: editId || uid(),
+      transactionType: 'point',
+      agent: agent,
+      branch: branch,
+      date: date,
+      submittedAt: (existingRecord && existingRecord.submittedAt) || now,
+      note: note,
+      kpiService: kpiService,
+      kpiAmount: kpiAmount,
+      kpiPoints: kpiPoints,
+      customerPhone: customerPhone,
+      items: {},
+      dollarItems: {}
+    };
+  } else {
+    // Unit-Based transaction (existing logic)
+    const items = {}, dollarItems = {};
+    let autoRevenue = 0;
+    UNIT_SALE_ITEMS.forEach(function(item) {
+      const inp = g('sic-' + item.id);
+      if (!inp) return;
+      const val = parseFloat(inp.value) || 0;
+      if (val > 0) items[item.id] = val;
+    });
+    DOLLAR_SALE_ITEMS.forEach(function(item) {
+      const inp = g('sic-' + item.id);
+      if (!inp) return;
+      const val = parseFloat(inp.value) || 0;
+      if (val > 0) dollarItems[item.id] = val;
+      autoRevenue += val;
+    });
+    if (autoRevenue > 0) dollarItems[ITEM_ID_REVENUE] = autoRevenue;
+    obj = {
+      id: editId || uid(),
+      transactionType: 'unit',
+      agent: agent,
+      branch: branch,
+      date: date,
+      submittedAt: (existingRecord && existingRecord.submittedAt) || now,
+      note: note,
+      items: items,
+      dollarItems: dollarItems
+    };
+  }
 
   if (editId) {
     if (existingRecord && !canModifySaleRecord(existingRecord)) { showSalePermissionError('edit'); return; }
@@ -1365,6 +1527,7 @@ function submitSale(e) {
   closeModal('modal-newSale');
   applyReportFilters();
   if (currentPage === 'dashboard') renderDashboard();
+  if (currentPage === 'performance') renderPerformancePage();
   syncSheet('Sales', saleRecords);
   if (!editId) appendDailySale(obj);
   saveAllData();
@@ -1570,7 +1733,7 @@ function setReportView(view) {
 
 function updateSaleKpis() {
   const data = filteredSales;
-  let totalRevenue = 0, totalRecharge = 0, totalGrossAds = 0, totalHomeInternet = 0;
+  let totalRevenue = 0, totalRecharge = 0, totalGrossAds = 0, totalHomeInternet = 0, totalPoints = 0;
 
   data.forEach(function(s) {
     // Total Revenue: sum of Revenue (RV) dollar item
@@ -1582,12 +1745,15 @@ function updateSaleKpis() {
     // Total Home Internet: sum of Smart@Home (SH) + Smart Fiber+ (SF)
     if (s.items && s.items[ITEM_ID_SMART_HOME]) totalHomeInternet += s.items[ITEM_ID_SMART_HOME];
     if (s.items && s.items[ITEM_ID_SMART_FIBER]) totalHomeInternet += s.items[ITEM_ID_SMART_FIBER];
+    // Total Points (Point-Based transactions)
+    if (s.transactionType === 'point' && s.kpiPoints) totalPoints += parseFloat(s.kpiPoints) || 0;
   });
 
   const el1 = g('sale-kpi-revenue'); if (el1) el1.textContent = fmtMoney(totalRevenue);
   const el2 = g('sale-kpi-recharge'); if (el2) el2.textContent = fmtMoney(totalRecharge);
   const el3 = g('sale-kpi-gross-ads'); if (el3) el3.textContent = totalGrossAds;
   const el4 = g('sale-kpi-home-internet'); if (el4) el4.textContent = totalHomeInternet;
+  const el5 = g('sale-kpi-points'); if (el5) el5.textContent = totalPoints % 1 === 0 ? totalPoints.toString() : totalPoints.toFixed(2);
 }
 
 function renderSaleTable() {
@@ -1629,52 +1795,83 @@ function renderSaleTable() {
 
   if (!data.length) {
     table.innerHTML = '<thead></thead><tbody><tr><td colspan="20" style="text-align:center;padding:40px;color:#999;"><i class="fas fa-inbox" style="font-size:2rem;display:block;margin-bottom:8px;"></i>No records found</td></tr></tbody>';
-    updateTotalBar(0, 0);
+    updateTotalBar(0, 0, 0);
     return;
   }
+
+  // Separate unit-based and point-based records
+  var unitData  = data.filter(function(s) { return s.transactionType !== 'point'; });
+  var pointData = data.filter(function(s) { return s.transactionType === 'point'; });
 
   // Always show all active item columns regardless of whether they have data
   const unitItems = itemCatalogue.filter(function(x) { return x.group === 'unit' && x.status === 'active'; });
   const dollarItems = itemCatalogue.filter(function(x) { return x.group === 'dollar' && x.status === 'active' && x.id !== ITEM_ID_REVENUE; });
 
-  let headerRow1 = '<tr><th rowspan="2">Agent</th><th rowspan="2">Branch</th><th rowspan="2">Submit Date</th>';
+  let headerRow1 = '<tr><th rowspan="2">Type</th><th rowspan="2">Agent</th><th rowspan="2">Branch</th><th rowspan="2">Submit Date</th>';
   if (unitItems.length) headerRow1 += '<th colspan="' + unitItems.length + '" class="th-group-unit">Unit Group</th>';
   if (dollarItems.length) headerRow1 += '<th colspan="' + dollarItems.length + '" class="th-group-dollar">Dollar Group</th>';
-  headerRow1 += '<th rowspan="2" class="td-buy-number">Total Revenue</th><th rowspan="2">Remark</th><th rowspan="2">Actions</th></tr>';
+  headerRow1 += '<th rowspan="2" class="td-buy-number">Revenue / Points</th><th rowspan="2">Remark / Service</th><th rowspan="2">Actions</th></tr>';
 
   let headerRow2 = '<tr>';
   unitItems.forEach(function(item) { headerRow2 += '<th class="th-unit">' + esc(item.shortcut || item.name) + '</th>'; });
   dollarItems.forEach(function(item) { headerRow2 += '<th class="th-dollar">' + esc(item.shortcut || item.name) + '</th>'; });
   headerRow2 += '</tr>';
 
-  let totalUnits = 0, totalDollar = 0;
+  let totalUnits = 0, totalDollar = 0, totalPoints = 0;
 
   const bodyRows = data.map(function(s) {
-    const unitCells = unitItems.map(function(item) {
-      const qty = s.items && s.items[item.id] ? s.items[item.id] : 0;
-      totalUnits += qty;
-      return '<td class="td-unit">' + (qty || '') + '</td>';
-    }).join('');
-    const dollarCells = dollarItems.map(function(item) {
-      const amt = s.dollarItems && s.dollarItems[item.id] ? s.dollarItems[item.id] : 0;
-      totalDollar += amt;
-      return '<td class="td-dollar">' + (amt > 0 ? fmtMoney(amt, esc(item.currency) + ' ') : '') + '</td>';
-    }).join('');
-    const saleRev = s.dollarItems && s.dollarItems[ITEM_ID_REVENUE] ? s.dollarItems[ITEM_ID_REVENUE] : 0;
-
-    // Determine if the current user can edit/delete this record
     const canEdit = canModifySaleRecord(s);
-
     const avIdx = Math.abs((s.agent.charCodeAt(0) || 0)) % 8;
     const submitDate = dateOf(s.submittedAt) || dateOf(s.date);
+
+    var typeBadge, revCell, remarkCell;
+    var unitCells, dollarCells;
+
+    if (s.transactionType === 'point') {
+      // Point-Based row
+      var svc = KPI_SERVICES.find(function(x) { return x.id === s.kpiService; });
+      var svcName = svc ? svc.name + ' (' + svc.category + ')' : (s.kpiService || '');
+      var pts = parseFloat(s.kpiPoints) || 0;
+      totalPoints += pts;
+      typeBadge = '<span class="type-badge type-badge--point"><i class="fas fa-star"></i> Point</span>';
+      unitCells = unitItems.map(function() { return '<td class="td-unit" style="color:#ccc;">—</td>'; }).join('');
+      dollarCells = dollarItems.map(function() { return '<td class="td-dollar" style="color:#ccc;">—</td>'; }).join('');
+      revCell = '<td class="td-buy-number"><span style="color:#FF9800;font-weight:600;">' +
+        (pts % 1 === 0 ? pts : pts.toFixed(2)) + ' pts</span>' +
+        (s.kpiAmount ? '<br><small style="color:#888;">$' + parseFloat(s.kpiAmount).toFixed(2) + '</small>' : '') +
+        '</td>';
+      remarkCell = '<td style="font-size:0.82rem;">' +
+        '<span style="color:#555;">' + esc(svcName) + '</span>' +
+        (s.customerPhone ? '<br><small style="color:#888;"><i class="fas fa-phone"></i> ' + esc(s.customerPhone) + '</small>' : '') +
+        (s.note ? '<br><small style="color:#aaa;">' + esc(s.note) + '</small>' : '') +
+        '</td>';
+    } else {
+      // Unit-Based row
+      typeBadge = '<span class="type-badge type-badge--unit"><i class="fas fa-boxes-stacked"></i> Unit</span>';
+      unitCells = unitItems.map(function(item) {
+        const qty = s.items && s.items[item.id] ? s.items[item.id] : 0;
+        totalUnits += qty;
+        return '<td class="td-unit">' + (qty || '') + '</td>';
+      }).join('');
+      dollarCells = dollarItems.map(function(item) {
+        const amt = s.dollarItems && s.dollarItems[item.id] ? s.dollarItems[item.id] : 0;
+        totalDollar += amt;
+        return '<td class="td-dollar">' + (amt > 0 ? fmtMoney(amt, esc(item.currency) + ' ') : '') + '</td>';
+      }).join('');
+      const saleRev = s.dollarItems && s.dollarItems[ITEM_ID_REVENUE] ? s.dollarItems[ITEM_ID_REVENUE] : 0;
+      revCell = '<td class="td-buy-number">' + fmtMoney(saleRev) + '</td>';
+      remarkCell = '<td style="color:#888;font-size:0.8rem;">' + esc(s.note || s.remark || '') + '</td>';
+    }
+
     return '<tr>' +
+      '<td>' + typeBadge + '</td>' +
       '<td><div class="name-cell"><span class="avatar-circle av-' + avIdx + '" style="width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;color:#fff;margin-right:8px;">' + esc(ini(s.agent)) + '</span>' + esc(s.agent) + '</div></td>' +
       '<td>' + esc(s.branch) + '</td>' +
       '<td style="white-space:nowrap;font-size:0.82rem;color:#555;">' + esc(submitDate) + '</td>' +
       unitCells +
       dollarCells +
-      '<td class="td-buy-number">' + fmtMoney(saleRev) + '</td>' +
-      '<td style="color:#888;font-size:0.8rem;">' + esc(s.note || s.remark || '') + '</td>' +
+      revCell +
+      remarkCell +
       '<td style="white-space:nowrap;">' +
         (canEdit ? '<button class="btn-edit" onclick="editSale(\'' + esc(s.id) + '\')"><i class="fas fa-edit"></i></button> ' : '') +
         (canEdit ? '<button class="btn-delete" onclick="deleteSale(\'' + esc(s.id) + '\')"><i class="fas fa-trash"></i></button>' : '') +
@@ -1690,15 +1887,16 @@ function renderSaleTable() {
   // Ensure thead is always the first child in the DOM for correct sticky-header and display ordering
   if (table.firstChild !== thead) table.insertBefore(thead, table.firstChild);
 
-  updateTotalBar(totalUnits, totalDollar);
+  updateTotalBar(totalUnits, totalDollar, totalPoints);
 }
 
-function updateTotalBar(units, dollar) {
+function updateTotalBar(units, dollar, points) {
   const bar = g('sale-total-bar');
   if (!bar) return;
   bar.innerHTML =
     '<span class="total-label"><strong>Total Units:</strong> ' + units + '</span>' +
-    '<span class="total-label"><strong>Total $:</strong> ' + fmtMoney(dollar) + '</span>';
+    '<span class="total-label"><strong>Total $:</strong> ' + fmtMoney(dollar) + '</span>' +
+    (points ? '<span class="total-label"><strong>Total Points:</strong> <span style="color:#FF9800;">' + (Number.isInteger(points) ? points : points.toFixed(2)) + '</span></span>' : '');
 }
 
 // ------------------------------------------------------------
@@ -6474,4 +6672,117 @@ function calcSaleTrackingRows(agentName, kpi, ym, branchFilter) {
     carryIn = carryOut;
   }
   return rows;
+}
+
+// ============================================================
+// Performance Tracking Page
+// ============================================================
+
+function getAgentPointsThisMonth(agentName) {
+  var ym = ymNow();
+  var pts = 0;
+  saleRecords.forEach(function(s) {
+    if (agentName && s.agent !== agentName) return;
+    if (ymOf(s.date) !== ym) return;
+    if (s.transactionType === 'point' && s.kpiPoints) {
+      pts += parseFloat(s.kpiPoints) || 0;
+    }
+  });
+  return pts;
+}
+
+function renderPerformancePage() {
+  var isAdmin   = (currentRole === 'admin' || currentRole === 'cluster');
+  var isSupervisor = (currentRole === 'supervisor');
+  var agentName = (currentUser && !isAdmin && !isSupervisor) ? (currentUser.name || '') : '';
+  var role = isSupervisor ? 'supervisor' : 'agent';
+  var tiers = KPI_TIERS[role];
+
+  var totalPts = getAgentPointsThisMonth(agentName);
+  var today = new Date();
+  var daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  var dayOfMonth = today.getDate();
+  var daysLeft = daysInMonth - dayOfMonth;
+  var remaining = Math.max(0, tiers.gate - totalPts);
+  var dailyReq = daysLeft > 0 ? Math.ceil(remaining / daysLeft) : remaining;
+  var tierInfo = getKpiTierLabel(totalPts, role);
+
+  // Update KPI cards
+  var totalEl = g('perf-total-points');
+  var gateEl = g('perf-gate-target');
+  var dailyEl = g('perf-daily-required');
+  var tierEl = g('perf-tier-badge');
+  if (totalEl) totalEl.textContent = totalPts % 1 === 0 ? totalPts.toString() : totalPts.toFixed(2);
+  if (gateEl) gateEl.textContent = tiers.gate.toLocaleString();
+  if (dailyEl) dailyEl.textContent = dailyReq > 0 ? dailyReq.toString() : '0';
+  if (tierEl) {
+    tierEl.innerHTML = '<span class="tier-badge" style="background:' + tierInfo.color + ';color:#fff;padding:2px 10px;border-radius:12px;font-size:0.85rem;">' +
+      tierInfo.label + '</span>';
+  }
+
+  // Render tier achievement table
+  var tbody = g('perf-tier-tbody');
+  if (tbody) {
+    var tierRows = [
+      { name: 'Min',  pts: tiers.min  },
+      { name: 'Gate', pts: tiers.gate },
+      { name: 'OTB',  pts: tiers.otb  },
+      { name: 'OAB',  pts: tiers.oab  }
+    ];
+    tbody.innerHTML = tierRows.map(function(t) {
+      var pct = Math.min(100, totalPts > 0 ? Math.round((totalPts / t.pts) * 100) : 0);
+      var rem = Math.max(0, t.pts - totalPts);
+      var reached = totalPts >= t.pts;
+      return '<tr>' +
+        '<td><strong>' + t.name + '</strong></td>' +
+        '<td>' + t.pts.toLocaleString() + '</td>' +
+        '<td>' + (totalPts % 1 === 0 ? totalPts.toString() : totalPts.toFixed(2)) + '</td>' +
+        '<td><div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:' + pct + '%;background:' + (reached ? '#4CAF50' : '#1B7D3D') + ';"></div></div> ' + pct + '%</td>' +
+        '<td>' + (reached ? '<span style="color:#4CAF50;">✓ Reached</span>' : rem.toFixed(1)) + '</td>' +
+        '<td><span class="status-badge ' + (reached ? 'status-active' : 'status-pending') + '">' + (reached ? 'Done' : 'Pending') + '</span></td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  // Agent Performance Table (supervisors and admins)
+  var agentWrap = g('perf-agent-table-wrap');
+  if (agentWrap) {
+    if (isAdmin || isSupervisor) {
+      agentWrap.style.display = '';
+      var agentTbody = g('perf-agent-tbody');
+      if (agentTbody) {
+        // Collect all agents from sale records this month
+        var ym = ymNow();
+        var agentMap = {};
+        saleRecords.forEach(function(s) {
+          if (!s.agent) return;
+          if (ymOf(s.date) !== ym) return;
+          if (isSupervisor && currentUser && s.branch !== currentUser.branch) return;
+          if (!agentMap[s.agent]) agentMap[s.agent] = { name: s.agent, branch: s.branch || '', points: 0 };
+          if (s.transactionType === 'point' && s.kpiPoints) {
+            agentMap[s.agent].points += parseFloat(s.kpiPoints) || 0;
+          }
+        });
+        var agentRows = Object.values(agentMap).sort(function(a, b) { return b.points - a.points; });
+        if (agentRows.length === 0) {
+          agentTbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;">No point-based sales this month</td></tr>';
+        } else {
+          agentTbody.innerHTML = agentRows.map(function(a) {
+            var pct = Math.min(100, a.points > 0 ? Math.round((a.points / tiers.gate) * 100) : 0);
+            var tier = getKpiTierLabel(a.points, 'agent');
+            return '<tr>' +
+              '<td>' + esc(a.name) + '</td>' +
+              '<td>' + esc(a.branch) + '</td>' +
+              '<td>' + (a.points % 1 === 0 ? a.points.toString() : a.points.toFixed(2)) + '</td>' +
+              '<td>' + tiers.gate.toLocaleString() + '</td>' +
+              '<td>' + pct + '%</td>' +
+              '<td><span class="tier-badge" style="background:' + tier.color + ';color:#fff;padding:2px 8px;border-radius:10px;font-size:0.78rem;">' + tier.label + '</span></td>' +
+              '</tr>';
+          }).join('');
+        }
+      }
+    } else {
+      agentWrap.style.display = 'none';
+    }
+  }
 }

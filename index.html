@@ -461,6 +461,10 @@
           <i class="fas fa-chart-line submenu-icon"></i>
           <span>Sale Tracking</span>
         </li>
+        <li class="submenu-item" id="nav-performance" onclick="navigateTo('performance', null); setActiveSubItem(this)">
+          <i class="fas fa-trophy submenu-icon"></i>
+          <span>Performance</span>
+        </li>
         <li class="submenu-item" id="nav-kpi" onclick="navigateTo('kpi', null); setActiveSubItem(this)">
           <i class="fas fa-crosshairs submenu-icon"></i>
           <span>KPI Setting</span>
@@ -958,6 +962,10 @@
             <div class="kpi-card-icon kpi-icon-teal"><i class="fas fa-house-signal"></i></div>
             <div class="kpi-card-body"><p class="kpi-label">Total Home Internet</p><p class="kpi-subtitle">Smart@Home + Smart Fiber+</p><p class="kpi-value" id="sale-kpi-home-internet">0</p></div>
           </div>
+          <div class="kpi-card">
+            <div class="kpi-card-icon kpi-icon-green"><i class="fas fa-star"></i></div>
+            <div class="kpi-card-body"><p class="kpi-label">Total KPI Points</p><p class="kpi-subtitle">Point-Based transactions</p><p class="kpi-value" id="sale-kpi-points">0</p></div>
+          </div>
         </div>
 
         <div class="view-toggle-bar">
@@ -1039,6 +1047,90 @@
         </div>
       </section>
       <!-- END SALE TRACKING PAGE -->
+
+      <!-- ========== PERFORMANCE PAGE ========== -->
+      <section class="page" id="page-performance">
+        <div class="page-header">
+          <h2 class="page-header-title"><i class="fas fa-trophy" style="color:#1B7D3D;margin-right:8px"></i>Performance Tracking</h2>
+        </div>
+
+        <!-- KPI Summary Cards -->
+        <div class="kpi-grid" id="perf-kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-card-icon kpi-icon-green"><i class="fas fa-star"></i></div>
+            <div class="kpi-card-body">
+              <p class="kpi-label">Total Points</p>
+              <p class="kpi-value" id="perf-total-points">0</p>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card-icon kpi-icon-blue"><i class="fas fa-bullseye"></i></div>
+            <div class="kpi-card-body">
+              <p class="kpi-label">Gate Target</p>
+              <p class="kpi-value" id="perf-gate-target">1,000</p>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card-icon kpi-icon-orange"><i class="fas fa-calendar-day"></i></div>
+            <div class="kpi-card-body">
+              <p class="kpi-label">Daily Required (Gate)</p>
+              <p class="kpi-value" id="perf-daily-required">0</p>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card-icon kpi-icon-purple"><i class="fas fa-medal"></i></div>
+            <div class="kpi-card-body">
+              <p class="kpi-label">Current Tier</p>
+              <p class="kpi-value" id="perf-tier-badge" style="font-size:1rem;">—</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Achievement table -->
+        <div class="table-card">
+          <div class="table-card-header" style="padding:12px 16px;font-weight:600;color:#1B7D3D;">
+            <i class="fas fa-chart-bar"></i> KPI Tier Achievement
+          </div>
+          <div class="table-responsive">
+            <table class="data-table" id="perf-tier-table">
+              <thead>
+                <tr>
+                  <th>Tier</th>
+                  <th>Points Required</th>
+                  <th>Your Points</th>
+                  <th>Achievement %</th>
+                  <th>Remaining</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="perf-tier-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Agent Performance Table (supervisor/admin only) -->
+        <div class="table-card" id="perf-agent-table-wrap" style="display:none;margin-top:16px;">
+          <div class="table-card-header" style="padding:12px 16px;font-weight:600;color:#1B7D3D;">
+            <i class="fas fa-users"></i> Agent Performance
+          </div>
+          <div class="table-responsive">
+            <table class="data-table" id="perf-agent-table">
+              <thead>
+                <tr>
+                  <th>Agent Name</th>
+                  <th>Branch</th>
+                  <th>Total Points</th>
+                  <th>Gate Target</th>
+                  <th>Achievement %</th>
+                  <th>Tier</th>
+                </tr>
+              </thead>
+              <tbody id="perf-agent-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+      <!-- END PERFORMANCE PAGE -->
 
       <!-- ========== CUSTOMER PAGE ========== -->
       <section class="page" id="page-customer">
@@ -1601,6 +1693,15 @@
       </div>
       <form id="form-newSale" onsubmit="submitSale(event)">
         <div class="modal-body">
+          <!-- Transaction Type Toggle -->
+          <div class="sale-type-toggle" id="sale-type-toggle">
+            <button type="button" class="sale-type-btn active" id="sale-type-btn-unit" onclick="switchSaleModalType('unit')">
+              <i class="fas fa-boxes-stacked"></i> Unit Based
+            </button>
+            <button type="button" class="sale-type-btn" id="sale-type-btn-point" onclick="switchSaleModalType('point')">
+              <i class="fas fa-star"></i> Point Based
+            </button>
+          </div>
           <div class="form-row">
             <div class="form-group form-col">
               <label class="form-label" for="sale-agent-name">Agent Name <span class="required">*</span></label>
@@ -1610,9 +1711,6 @@
               <label class="form-label" for="sale-branch">Branch <span class="required">*</span></label>
               <select class="form-select" id="sale-branch" required>
                 <option value="">Select branch</option>
-                <option value="Phnom Penh">Phnom Penh</option>
-                <option value="Siem Reap">Siem Reap</option>
-                <option value="Battambang">Battambang</option>
               </select>
             </div>
           </div>
@@ -1628,15 +1726,51 @@
               <input type="text" class="form-input" id="sale-remark" placeholder="Optional remark" />
             </div>
           </div>
-          <div class="sale-items-section">
-            <h4 class="sale-section-title sale-section-title--unit"><i class="fas fa-boxes-stacked"></i> Unit Group Items</h4>
-            <div id="sale-unit-items"></div>
+
+          <!-- Unit Based section -->
+          <div id="sale-unit-section">
+            <div class="sale-items-section">
+              <h4 class="sale-section-title sale-section-title--unit"><i class="fas fa-boxes-stacked"></i> Unit Group Items</h4>
+              <div id="sale-unit-items"></div>
+            </div>
+            <div class="sale-items-section">
+              <h4 class="sale-section-title sale-section-title--dollar"><i class="fas fa-dollar-sign"></i> Dollar Group Items</h4>
+              <div id="sale-dollar-items"></div>
+              <div id="sale-revenue-total" style="display:none;"></div>
+            </div>
           </div>
-          <div class="sale-items-section">
-            <h4 class="sale-section-title sale-section-title--dollar"><i class="fas fa-dollar-sign"></i> Dollar Group Items</h4>
-            <div id="sale-dollar-items"></div>
-            <div id="sale-revenue-total" style="display:none;"></div>
+
+          <!-- Point Based section -->
+          <div id="sale-point-section" style="display:none;">
+            <div class="sale-items-section">
+              <h4 class="sale-section-title sale-section-title--point"><i class="fas fa-star"></i> KPI Service Details</h4>
+              <div class="form-row">
+                <div class="form-group form-col">
+                  <label class="form-label" for="sale-kpi-service">Service Type <span class="required">*</span></label>
+                  <select class="form-select" id="sale-kpi-service" onchange="updateKpiPointPreview()">
+                    <option value="">Select service</option>
+                  </select>
+                </div>
+                <div class="form-group form-col">
+                  <label class="form-label" for="sale-kpi-amount">Amount ($) <span class="required">*</span></label>
+                  <input type="number" class="form-input" id="sale-kpi-amount" min="0" step="0.01" placeholder="0.00" oninput="updateKpiPointPreview()" />
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group form-col">
+                  <label class="form-label" for="sale-kpi-phone">Customer Phone</label>
+                  <input type="text" class="form-input" id="sale-kpi-phone" placeholder="Optional phone number" />
+                </div>
+                <div class="form-group form-col kpi-points-preview-wrap">
+                  <label class="form-label">Points Preview</label>
+                  <div class="kpi-points-preview" id="kpi-points-preview">
+                    <i class="fas fa-star"></i> <span id="kpi-points-value">0.0</span> pts
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
+
           <input type="hidden" id="sale-edit-id" />
         </div>
         <div class="modal-footer">
