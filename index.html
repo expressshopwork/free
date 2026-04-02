@@ -457,13 +457,9 @@
           <i class="fas fa-calendar-check submenu-icon"></i>
           <span>Daily Sale</span>
         </li>
-        <li class="submenu-item" id="nav-sale-tracking" onclick="navigateTo('sale-tracking', null); setActiveSubItem(this)">
-          <i class="fas fa-chart-line submenu-icon"></i>
-          <span>Sale Tracking</span>
-        </li>
         <li class="submenu-item" id="nav-performance" onclick="navigateTo('performance', null); setActiveSubItem(this)">
           <i class="fas fa-trophy submenu-icon"></i>
-          <span>Performance</span>
+          <span>Performance Tracking</span>
         </li>
         <li class="submenu-item" id="nav-kpi" onclick="navigateTo('kpi', null); setActiveSubItem(this)">
           <i class="fas fa-crosshairs submenu-icon"></i>
@@ -996,141 +992,173 @@
       </section>
       <!-- END SALE PAGE -->
 
-      <!-- ========== SALE TRACKING PAGE ========== -->
-      <section class="page" id="page-sale-tracking">
-        <div class="page-header">
-          <h2 class="page-header-title"><i class="fas fa-chart-line" style="color:#1B7D3D;margin-right:8px"></i>Sale Tracking</h2>
-        </div>
-        <!-- Filter Bar -->
-        <div class="filter-bar">
-          <div class="filter-group">
-            <label class="filter-label"><i class="fas fa-calendar-alt"></i> Month</label>
-            <input type="month" class="form-input" id="st-month-picker" onchange="onStMonthChange()" />
-          </div>
-          <div class="filter-group" id="st-agent-filter-wrap">
-            <label class="filter-label"><i class="fas fa-user"></i> Agent</label>
-            <select class="form-select" id="st-agent-sel" onchange="onStAgentChange()">
-              <option value="">— Select Agent —</option>
-            </select>
-          </div>
-          <div class="filter-group">
-            <label class="filter-label"><i class="fas fa-crosshairs"></i> KPI</label>
-            <select class="form-select" id="st-kpi-sel" onchange="renderSaleTracking()">
-              <option value="">— Select KPI —</option>
-            </select>
-          </div>
-          <button class="btn btn-outline" onclick="setStMonth('prev')"><i class="fas fa-chevron-left"></i> Prev</button>
-          <button class="btn btn-outline" onclick="setStMonth('current')"><i class="fas fa-calendar-check"></i> This Month</button>
-        </div>
-        <!-- Summary Cards -->
-        <div class="kpi-grid" id="st-summary-cards" style="margin-bottom:16px;"></div>
-        <!-- Daily Tracking Table -->
-        <div class="table-card">
-          <div class="table-responsive">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Date</th>
-                  <th>Base/Day</th>
-                  <th>Carry-over</th>
-                  <th>Target</th>
-                  <th>Actual</th>
-                  <th>Balance</th>
-                  <th>Cumulative</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody id="st-table"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-      <!-- END SALE TRACKING PAGE -->
-
-      <!-- ========== PERFORMANCE PAGE ========== -->
+      <!-- ========== PERFORMANCE TRACKING PAGE (includes Sale Tracking tab) ========== -->
       <section class="page" id="page-performance">
         <div class="page-header">
           <h2 class="page-header-title"><i class="fas fa-trophy" style="color:#1B7D3D;margin-right:8px"></i>Performance Tracking</h2>
         </div>
 
-        <!-- KPI Summary Cards -->
-        <div class="kpi-grid" id="perf-kpi-grid">
-          <div class="kpi-card">
-            <div class="kpi-card-icon kpi-icon-green"><i class="fas fa-star"></i></div>
-            <div class="kpi-card-body">
-              <p class="kpi-label">Total Points</p>
-              <p class="kpi-value" id="perf-total-points">0</p>
+        <!-- Tab Navigation -->
+        <div class="tab-header" style="margin-bottom:16px;">
+          <button class="tab-btn active" id="perf-tab-btn-tracking" onclick="openPerfTab('tracking', this)">
+            <i class="fas fa-chart-line"></i> Sale Tracking
+          </button>
+          <button class="tab-btn" id="perf-tab-btn-performance" onclick="openPerfTab('performance', this)">
+            <i class="fas fa-trophy"></i> Performance
+          </button>
+        </div>
+
+        <!-- ── Tab: Sale Tracking ── -->
+        <div id="perf-tab-content-tracking" class="perf-tab-content">
+          <!-- Filter Bar -->
+          <div class="filter-bar">
+            <div class="filter-group">
+              <label class="filter-label"><i class="fas fa-calendar-alt"></i> Month</label>
+              <input type="month" class="form-input" id="st-month-picker" onchange="onStMonthChange()" />
             </div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-card-icon kpi-icon-blue"><i class="fas fa-bullseye"></i></div>
-            <div class="kpi-card-body">
-              <p class="kpi-label">Gate Target</p>
-              <p class="kpi-value" id="perf-gate-target">1,000</p>
+            <div class="filter-group" id="st-agent-filter-wrap">
+              <label class="filter-label"><i class="fas fa-user"></i> Agent</label>
+              <select class="form-select" id="st-agent-sel" onchange="onStAgentChange()">
+                <option value="">— Select Agent —</option>
+              </select>
             </div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-card-icon kpi-icon-orange"><i class="fas fa-calendar-day"></i></div>
-            <div class="kpi-card-body">
-              <p class="kpi-label">Daily Required (Gate)</p>
-              <p class="kpi-value" id="perf-daily-required">0</p>
+            <div class="filter-group">
+              <label class="filter-label"><i class="fas fa-crosshairs"></i> KPI</label>
+              <select class="form-select" id="st-kpi-sel" onchange="renderSaleTracking()">
+                <option value="">— Select KPI —</option>
+              </select>
             </div>
+            <button class="btn btn-outline" onclick="setStMonth('prev')"><i class="fas fa-chevron-left"></i> Prev</button>
+            <button class="btn btn-outline" onclick="setStMonth('current')"><i class="fas fa-calendar-check"></i> This Month</button>
           </div>
-          <div class="kpi-card">
-            <div class="kpi-card-icon kpi-icon-purple"><i class="fas fa-medal"></i></div>
-            <div class="kpi-card-body">
-              <p class="kpi-label">Current Tier</p>
-              <p class="kpi-value" id="perf-tier-badge" style="font-size:1rem;">—</p>
+          <!-- Summary Cards -->
+          <div class="kpi-grid" id="st-summary-cards" style="margin-bottom:16px;"></div>
+          <!-- Daily Tracking Table -->
+          <div class="table-card">
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Date</th>
+                    <th>Base/Day</th>
+                    <th>Carry-over</th>
+                    <th>Target</th>
+                    <th>Actual</th>
+                    <th>Balance</th>
+                    <th>Cumulative</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="st-table"></tbody>
+              </table>
             </div>
           </div>
         </div>
 
-        <!-- Achievement table -->
-        <div class="table-card">
-          <div class="table-card-header" style="padding:12px 16px;font-weight:600;color:#1B7D3D;">
-            <i class="fas fa-chart-bar"></i> KPI Tier Achievement
-          </div>
-          <div class="table-responsive">
-            <table class="data-table" id="perf-tier-table">
-              <thead>
-                <tr>
-                  <th>Tier</th>
-                  <th>Points Required</th>
-                  <th>Your Points</th>
-                  <th>Achievement %</th>
-                  <th>Remaining</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody id="perf-tier-tbody"></tbody>
-            </table>
-          </div>
-        </div>
+        <!-- ── Tab: Performance ── -->
+        <div id="perf-tab-content-performance" class="perf-tab-content" style="display:none;">
 
-        <!-- Agent Performance Table (supervisor/admin only) -->
-        <div class="table-card" id="perf-agent-table-wrap" style="display:none;margin-top:16px;">
-          <div class="table-card-header" style="padding:12px 16px;font-weight:600;color:#1B7D3D;">
-            <i class="fas fa-users"></i> Agent Performance
+          <!-- KPI Summary Cards -->
+          <div class="kpi-grid" id="perf-kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-card-icon kpi-icon-green"><i class="fas fa-star"></i></div>
+              <div class="kpi-card-body">
+                <p class="kpi-label">Total Points</p>
+                <p class="kpi-value" id="perf-total-points">0</p>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card-icon kpi-icon-purple"><i class="fas fa-flag"></i></div>
+              <div class="kpi-card-body">
+                <p class="kpi-label">MIN</p>
+                <p class="kpi-value" id="perf-min-target">—</p>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card-icon kpi-icon-blue"><i class="fas fa-bullseye"></i></div>
+              <div class="kpi-card-body">
+                <p class="kpi-label">Gate</p>
+                <p class="kpi-value" id="perf-gate-target">—</p>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card-icon kpi-icon-teal"><i class="fas fa-trophy"></i></div>
+              <div class="kpi-card-body">
+                <p class="kpi-label">OTB</p>
+                <p class="kpi-value" id="perf-otb-target">—</p>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card-icon kpi-icon-green"><i class="fas fa-crown"></i></div>
+              <div class="kpi-card-body">
+                <p class="kpi-label">OAB</p>
+                <p class="kpi-value" id="perf-oab-target">—</p>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card-icon kpi-icon-orange"><i class="fas fa-calendar-day"></i></div>
+              <div class="kpi-card-body">
+                <p class="kpi-label">Daily Required (Gate)</p>
+                <p class="kpi-value" id="perf-daily-required">0</p>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card-icon kpi-icon-purple"><i class="fas fa-medal"></i></div>
+              <div class="kpi-card-body">
+                <p class="kpi-label">Current Tier</p>
+                <p class="kpi-value" id="perf-tier-badge" style="font-size:1rem;">—</p>
+              </div>
+            </div>
           </div>
-          <div class="table-responsive">
-            <table class="data-table" id="perf-agent-table">
-              <thead>
-                <tr>
-                  <th>Agent Name</th>
-                  <th>Branch</th>
-                  <th>Total Points</th>
-                  <th>Gate Target</th>
-                  <th>Achievement %</th>
-                  <th>Tier</th>
-                </tr>
-              </thead>
-              <tbody id="perf-agent-tbody"></tbody>
-            </table>
+
+          <!-- Achievement table -->
+          <div class="table-card">
+            <div class="table-card-header" style="padding:12px 16px;font-weight:600;color:#1B7D3D;">
+              <i class="fas fa-chart-bar"></i> KPI Tier Achievement
+            </div>
+            <div class="table-responsive">
+              <table class="data-table" id="perf-tier-table">
+                <thead>
+                  <tr>
+                    <th>Tier</th>
+                    <th>Points Required</th>
+                    <th>Your Points</th>
+                    <th>Achievement %</th>
+                    <th>Remaining</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="perf-tier-tbody"></tbody>
+              </table>
+            </div>
           </div>
+
+          <!-- Agent Performance Table (supervisor/admin only) -->
+          <div class="table-card" id="perf-agent-table-wrap" style="display:none;margin-top:16px;">
+            <div class="table-card-header" style="padding:12px 16px;font-weight:600;color:#1B7D3D;">
+              <i class="fas fa-users"></i> Agent Performance
+            </div>
+            <div class="table-responsive">
+              <table class="data-table" id="perf-agent-table">
+                <thead>
+                  <tr>
+                    <th>Agent Name</th>
+                    <th>Branch</th>
+                    <th>Total Points</th>
+                    <th>Gate Target</th>
+                    <th>Achievement %</th>
+                    <th>Tier</th>
+                  </tr>
+                </thead>
+                <tbody id="perf-agent-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
       </section>
-      <!-- END PERFORMANCE PAGE -->
+      <!-- END PERFORMANCE TRACKING PAGE -->
 
       <!-- ========== CUSTOMER PAGE ========== -->
       <section class="page" id="page-customer">
@@ -2149,9 +2177,31 @@
               <button type="button" class="chip kpi-type-chip" id="kpi-chip-Customers" data-value="Customers" onclick="selectKpiType(this)">Customers</button>
             </div>
           </div>
-          <div class="form-group">
+          <div class="form-group" id="kpi-target-field">
             <label class="form-label" for="kpi-target">Target Value <span class="required">*</span></label>
-            <input type="number" class="form-input" id="kpi-target" placeholder="0" min="0" required />
+            <input type="number" class="form-input" id="kpi-target" placeholder="0" min="0" />
+          </div>
+          <!-- Point Tier Targets (shown when Point-based mode is selected) -->
+          <div class="form-group" id="kpi-point-targets-field" style="display:none;">
+            <label class="form-label">Point Tier Targets <span class="required">*</span></label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;">
+              <div>
+                <label class="form-label" style="font-size:.82rem;color:#555;">MIN</label>
+                <input type="number" class="form-input" id="kpi-point-min" placeholder="0" min="0" />
+              </div>
+              <div>
+                <label class="form-label" style="font-size:.82rem;color:#555;">Gate</label>
+                <input type="number" class="form-input" id="kpi-point-gate" placeholder="0" min="0" />
+              </div>
+              <div>
+                <label class="form-label" style="font-size:.82rem;color:#555;">OTB</label>
+                <input type="number" class="form-input" id="kpi-point-otb" placeholder="0" min="0" />
+              </div>
+              <div>
+                <label class="form-label" style="font-size:.82rem;color:#555;">OAB</label>
+                <input type="number" class="form-input" id="kpi-point-oab" placeholder="0" min="0" />
+              </div>
+            </div>
           </div>
           <div class="form-group" id="kpi-valuemode-group">
             <label class="form-label">Value Mode</label>
@@ -2180,12 +2230,6 @@
                 <option value="">All Dollar Items</option>
               </select>
             </div>
-          </div>
-          <!-- Point Items Configuration (shown when Point-based KPI mode is selected) -->
-          <div class="form-group" id="kpi-point-items-field" style="display:none;">
-            <label class="form-label">Point Configuration <span class="required">*</span></label>
-            <p class="kpi-point-hint">Assign points earned per unit sold for each item.</p>
-            <div id="kpi-point-items-list" class="kpi-point-items-list"></div>
           </div>
           <div class="form-group">
             <label class="form-label" for="kpi-period">Period <span class="required">*</span></label>

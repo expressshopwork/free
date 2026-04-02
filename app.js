@@ -21,9 +21,9 @@ let kpiValueMode = 'unit'; // 'unit' or 'currency'
 let kpiTypeSelected = 'Sales';
 let kpiForSelected = 'shop'; // 'shop' or 'agent'
 let kpiModeSelected = 'volume'; // 'volume' or 'point'
-var _kpiEditPointItems = null; // point items when editing a point-based KPI
 let kpiSelectedMonth = ''; // '' means no filter (show all)
 let stSelectedMonth = ''; // Sale Tracking selected month
+let currentPerfTab = 'tracking'; // 'tracking' or 'performance'
 
 // Chart instances
 let _cTrend = null, _cMix = null, _cAgent = null, _cGrowth = null;
@@ -847,7 +847,6 @@ function navigateTo(page, btn) {
     promotionPage: currentPromoView === 'expired' ? 'Expired Promotion' : 'New Promotion',
     deposit: 'Deposit',
     sale: 'Sale',
-    'sale-tracking': 'Sale Tracking',
     performance: 'Performance Tracking',
     kpi: 'KPI Setting',
     customer: 'Customer',
@@ -864,8 +863,15 @@ function navigateTo(page, btn) {
   if (page === 'dashboard') renderDashboard();
   if (page === 'promotionPage') renderPromotionCards();
   if (page === 'kpi') { initKpiMonthPicker(); renderKpiTable(); }
-  if (page === 'sale-tracking') { initSaleTracking(); }
-  if (page === 'performance') { renderPerformancePage(); }
+  if (page === 'performance') {
+    // Reset to Sale Tracking tab when (re-)entering the page
+    currentPerfTab = 'tracking';
+    $$('.perf-tab-content').forEach(function(c) { c.style.display = 'none'; });
+    var tc = g('perf-tab-content-tracking'); if (tc) tc.style.display = '';
+    $$('[id^="perf-tab-btn-"]').forEach(function(b) { b.classList.remove('active'); });
+    var defBtn = g('perf-tab-btn-tracking'); if (defBtn) defBtn.classList.add('active');
+    initSaleTracking();
+  }
   if (page === 'deposit') { renderDepositTable(); updateDepositKpis(); }
   if (page === 'sale') { renderItemChips(); applyReportFilters(); }
   if (page === 'customer') {
@@ -924,6 +930,16 @@ function openCustomerTab(tab, btn) {
   switchCustomerTab(tab);
   $$('.customer-tab-btn').forEach(function(b) { b.classList.remove('active'); });
   if (btn) btn.classList.add('active');
+}
+
+function openPerfTab(tab, btn) {
+  currentPerfTab = tab;
+  $$('.perf-tab-content').forEach(function(c) { c.style.display = 'none'; });
+  var tc = g('perf-tab-content-' + tab);
+  if (tc) tc.style.display = '';
+  $$('[id^="perf-tab-btn-"]').forEach(function(b) { b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  if (tab === 'performance') renderPerformancePage();
 }
 
 function switchCustomerTab(tab) {
@@ -2523,12 +2539,22 @@ function calcKpiActual(kpi, ym) {
   }
   let actual = 0;
   if (kpi.kpiMode === 'point') {
-    var pointItems = kpi.pointItems || [];
-    filtered.forEach(function(s) {
-      pointItems.forEach(function(pi) {
-        actual += (Number(s.items && s.items[pi.itemId]) || 0) * (Number(pi.points) || 0);
+    // New-style point KPIs (with pointTiers) sum kpiPoints from sale records directly
+    if (kpi.pointTiers) {
+      filtered.forEach(function(s) {
+        if (s.transactionType === 'point' && s.kpiPoints) {
+          actual += parseFloat(s.kpiPoints) || 0;
+        }
       });
-    });
+    } else {
+      // Legacy point KPIs using pointItems mapping
+      var pointItems = kpi.pointItems || [];
+      filtered.forEach(function(s) {
+        pointItems.forEach(function(pi) {
+          actual += (Number(s.items && s.items[pi.itemId]) || 0) * (Number(pi.points) || 0);
+        });
+      });
+    }
     return actual;
   }
   if (kpi.valueMode === 'unit') {
@@ -4533,12 +4559,18 @@ function openKpiModal(item) {
     g('kpi-target').value = item.target || '';
     g('kpi-period').value = item.period || 'Monthly';
 
+    // Populate point tier fields if editing a point-based KPI
+    var pt = item.pointTiers || {};
+    var minEl = g('kpi-point-min'); if (minEl) minEl.value = pt.min || '';
+    var gateEl = g('kpi-point-gate'); if (gateEl) gateEl.value = pt.gate || '';
+    var otbEl = g('kpi-point-otb'); if (otbEl) otbEl.value = pt.otb || '';
+    var oabEl = g('kpi-point-oab'); if (oabEl) oabEl.value = pt.oab || '';
+
     kpiTypeSelected = item.type || 'Sales';
     $$('.kpi-type-chip').forEach(function(c) { c.classList.remove('active'); });
     const chip = g('kpi-chip-' + kpiTypeSelected);
     if (chip) chip.classList.add('active');
 
-    _kpiEditPointItems = item.pointItems || null;
     switchKpiScheme(item.kpiMode === 'point' ? 'point' : 'volume');
 
     if (item.kpiMode !== 'point') {
@@ -4565,7 +4597,6 @@ function openKpiModal(item) {
   } else {
     if (title) title.textContent = 'Add KPI';
     if (btn) btn.textContent = 'Add KPI';
-    _kpiEditPointItems = null;
     switchKpiScheme('volume');
   }
   openModal('modal-kpi');
@@ -4591,6 +4622,11 @@ function switchKpiScheme(mode) {
   var valuemodeGroup = g('kpi-valuemode-group');
   if (typeGroup) typeGroup.style.display = isPoint ? 'none' : '';
   if (valuemodeGroup) valuemodeGroup.style.display = isPoint ? 'none' : '';
+  // Toggle standard target field vs. point tier targets
+  var targetField = g('kpi-target-field');
+  var pointTargetsField = g('kpi-point-targets-field');
+  if (targetField) targetField.style.display = isPoint ? 'none' : '';
+  if (pointTargetsField) pointTargetsField.style.display = isPoint ? '' : 'none';
   if (isPoint) {
     var unitField = g('kpi-unit-field');
     var curField = g('kpi-currency-field');
@@ -4608,35 +4644,6 @@ function switchKpiScheme(mode) {
       setValueMode(kpiValueMode);
     }
   }
-  var pointField = g('kpi-point-items-field');
-  if (pointField) pointField.style.display = isPoint ? '' : 'none';
-  if (isPoint) renderKpiPointItemsConfig();
-}
-
-function renderKpiPointItemsConfig() {
-  var container = g('kpi-point-items-list');
-  if (!container) return;
-  var allItems = itemCatalogue.filter(function(x) { return x.status === 'active' && x.id !== ITEM_ID_REVENUE; });
-  container.innerHTML = allItems.map(function(item) {
-    var existing = _kpiEditPointItems ? _kpiEditPointItems.find(function(p) { return p.itemId === item.id; }) : null;
-    var pts = existing ? existing.points : 0;
-    return '<div class="kpi-point-item-row">' +
-      '<span class="kpi-point-item-name">' + esc(item.name) + '</span>' +
-      '<input type="number" class="form-input kpi-point-input" min="0" step="1" placeholder="0" ' +
-      'data-item-id="' + esc(item.id) + '" value="' + pts + '" />' +
-      '<span class="kpi-point-item-unit">pts</span>' +
-      '</div>';
-  }).join('');
-}
-
-function getKpiPointItems() {
-  var inputs = $$('#kpi-point-items-list .kpi-point-input');
-  var result = [];
-  inputs.forEach(function(input) {
-    var pts = parseInt(input.value, 10) || 0;
-    if (pts > 0) result.push({ itemId: input.getAttribute('data-item-id'), points: pts });
-  });
-  return result;
 }
 
 function setValueMode(mode) {
@@ -4708,19 +4715,25 @@ function submitKpi(e) {
     kpiFor: kpiForSelected,
     assigneeId: kpiForSelected === 'shop' ? rv('kpi-shop-assignee') : rv('kpi-agent-assignee'),
     assigneeBranch: kpiForSelected === 'agent' ? rv('kpi-agent-branch') : '',
-    target: parseFloat(rv('kpi-target')) || 0,
+    target: kpiModeSelected === 'point' ? 0 : (parseFloat(rv('kpi-target')) || 0),
     valueMode: kpiModeSelected === 'point' ? 'unit' : kpiValueMode,
     itemId: (kpiModeSelected !== 'point' && kpiValueMode === 'unit') ? rv('kpi-item-sel') :
             (kpiModeSelected !== 'point' && kpiValueMode === 'currency') ? rv('kpi-currency-item-sel') : '',
     unit: (kpiModeSelected !== 'point' && kpiValueMode === 'unit') ? rv('kpi-unit-val') : '',
     currency: (kpiModeSelected !== 'point' && kpiValueMode === 'currency') ? rv('kpi-currency-sel') : '',
-    pointItems: kpiModeSelected === 'point' ? getKpiPointItems() : [],
+    pointTiers: kpiModeSelected === 'point' ? {
+      min:  parseFloat(rv('kpi-point-min'))  || 0,
+      gate: parseFloat(rv('kpi-point-gate')) || 0,
+      otb:  parseFloat(rv('kpi-point-otb'))  || 0,
+      oab:  parseFloat(rv('kpi-point-oab'))  || 0
+    } : null,
     period: rv('kpi-period')
   };
   if (!obj.name) { showAlert('Please enter KPI name'); return; }
   if (kpiForSelected === 'shop' && !obj.assigneeId) { showAlert('Please select a supervisor'); return; }
   if (kpiForSelected === 'agent' && !obj.assigneeId) { showAlert('Please select an agent'); return; }
-  if (kpiModeSelected === 'point' && !obj.pointItems.length) { showAlert('Please assign points to at least one item.'); return; }
+  if (kpiModeSelected !== 'point' && obj.target <= 0) { showAlert('Please enter a target value greater than 0.'); return; }
+  if (kpiModeSelected === 'point' && (!obj.pointTiers || obj.pointTiers.gate <= 0)) { showAlert('Please enter at least a Gate target for the point-based KPI.'); return; }
   if (editId) {
     const idx = kpiList.findIndex(function(x) { return x.id === editId; });
     if (idx >= 0) kpiList[idx] = obj;
@@ -4848,16 +4861,23 @@ function renderKpiTable() {
       const typeLabel = k.type || (k.valueMode === 'currency' ? 'Amount' : 'Unit');
       const typePill = typeLabel === 'Sales' ? 'pill-green' : typeLabel === 'Revenue' || typeLabel === 'Amount' ? 'pill-orange' : typeLabel === 'Units' || typeLabel === 'Unit' ? 'pill-blue' : 'pill-purple';
       const unitLabel = getKpiUnitLabel(k);
-      const valueDisplay = (!isPoint && k.valueMode === 'currency')
-        ? fmtMoney(k.target, esc(k.currency) + ' ')
-        : k.target + (unitLabel ? ' ' + esc(unitLabel) : '');
+      var valueDisplay;
+      if (isPoint && k.pointTiers) {
+        var pt = k.pointTiers;
+        valueDisplay = '<small style="color:#555;">MIN:<b>' + (pt.min || 0) + '</b> Gate:<b>' + (pt.gate || 0) + '</b> OTB:<b>' + (pt.otb || 0) + '</b> OAB:<b>' + (pt.oab || 0) + '</b></small>';
+      } else {
+        valueDisplay = (!isPoint && k.valueMode === 'currency')
+          ? fmtMoney(k.target, esc(k.currency) + ' ')
+          : k.target + (unitLabel ? ' ' + esc(unitLabel) : '');
+      }
       const assignee = staffList.find(function(u) { return u.id === k.assigneeId; });
       const forLabel = k.kpiFor === 'shop' ? '<span class="pill pill-blue"><i class="fas fa-store"></i> Shop</span>' : '<span class="pill pill-orange"><i class="fas fa-user"></i> Agent</span>';
       const assigneeName = assignee ? esc(assignee.name) : (k.assigneeBranch ? esc(k.assigneeBranch) : '—');
       // Compute actual & achievement for selected month
       const ym = kpiSelectedMonth || ymNow();
       const actual = Math.round(calcKpiActual(k, ym) * 100) / 100;
-      const pct = k.target > 0 ? Math.round(actual / k.target * 100) : 0;
+      var gateTarget = (isPoint && k.pointTiers) ? (k.pointTiers.gate || 0) : k.target;
+      const pct = gateTarget > 0 ? Math.round(actual / gateTarget * 100) : 0;
       const pctClass = pct >= 100 ? 'pill-green' : pct >= 70 ? 'pill-orange' : 'pill-red';
       const actualDisplay = (!isPoint && k.valueMode === 'currency')
         ? fmtMoney(actual, esc(k.currency) + ' ')
@@ -6695,8 +6715,53 @@ function renderPerformancePage() {
   var isAdmin   = (currentRole === 'admin' || currentRole === 'cluster');
   var isSupervisor = (currentRole === 'supervisor');
   var agentName = (currentUser && !isAdmin && !isSupervisor) ? (currentUser.name || '') : '';
+
+  // Resolve tier thresholds: prefer active point-based KPI setting, fall back to KPI_TIERS constants
   var role = isSupervisor ? 'supervisor' : 'agent';
-  var tiers = KPI_TIERS[role];
+  var fallbackTiers = KPI_TIERS[role];
+  var tiers = fallbackTiers; // default
+
+  // Find a point-based KPI assigned to the current user's shop/branch
+  var pointKpi = null;
+  if (isAdmin || isSupervisor) {
+    // Supervisors/admins: look for a shop-level point KPI for this branch
+    if (currentUser) {
+      pointKpi = kpiList.find(function(k) {
+        if (k.kpiMode !== 'point' || !k.pointTiers) return false;
+        if (k.kpiFor === 'shop') {
+          var sup = staffList.find(function(u) { return u.id === k.assigneeId; });
+          return sup && sup.branch === currentUser.branch;
+        }
+        return false;
+      });
+    }
+    if (!pointKpi) {
+      // Try any point KPI for admins
+      pointKpi = kpiList.find(function(k) { return k.kpiMode === 'point' && k.pointTiers; });
+    }
+  } else if (currentUser) {
+    // Agent: look for agent-level point KPI first, then shop-level for their branch
+    pointKpi = kpiList.find(function(k) {
+      return k.kpiMode === 'point' && k.pointTiers && k.kpiFor === 'agent' && k.assigneeId === currentUser.id;
+    });
+    if (!pointKpi && currentUser.branch) {
+      var branchSup = staffList.find(function(u) { return u.role === 'Supervisor' && u.branch === currentUser.branch; });
+      if (branchSup) {
+        pointKpi = kpiList.find(function(k) {
+          return k.kpiMode === 'point' && k.pointTiers && k.kpiFor === 'shop' && k.assigneeId === branchSup.id;
+        });
+      }
+    }
+  }
+
+  if (pointKpi && pointKpi.pointTiers) {
+    tiers = {
+      min:  pointKpi.pointTiers.min  || fallbackTiers.min,
+      gate: pointKpi.pointTiers.gate || fallbackTiers.gate,
+      otb:  pointKpi.pointTiers.otb  || fallbackTiers.otb,
+      oab:  pointKpi.pointTiers.oab  || fallbackTiers.oab
+    };
+  }
 
   var totalPts = getAgentPointsThisMonth(agentName);
   var today = new Date();
@@ -6709,11 +6774,17 @@ function renderPerformancePage() {
 
   // Update KPI cards
   var totalEl = g('perf-total-points');
+  var minEl = g('perf-min-target');
   var gateEl = g('perf-gate-target');
+  var otbEl = g('perf-otb-target');
+  var oabEl = g('perf-oab-target');
   var dailyEl = g('perf-daily-required');
   var tierEl = g('perf-tier-badge');
   if (totalEl) totalEl.textContent = totalPts % 1 === 0 ? totalPts.toString() : totalPts.toFixed(2);
+  if (minEl) minEl.textContent = tiers.min.toLocaleString();
   if (gateEl) gateEl.textContent = tiers.gate.toLocaleString();
+  if (otbEl) otbEl.textContent = tiers.otb.toLocaleString();
+  if (oabEl) oabEl.textContent = tiers.oab.toLocaleString();
   if (dailyEl) dailyEl.textContent = dailyReq > 0 ? dailyReq.toString() : '0';
   if (tierEl) {
     tierEl.innerHTML = '<span class="tier-badge" style="background:' + tierInfo.color + ';color:#fff;padding:2px 10px;border-radius:12px;font-size:0.85rem;">' +
@@ -6730,9 +6801,9 @@ function renderPerformancePage() {
       { name: 'OAB',  pts: tiers.oab  }
     ];
     tbody.innerHTML = tierRows.map(function(t) {
-      var pct = Math.min(100, totalPts > 0 ? Math.round((totalPts / t.pts) * 100) : 0);
+      var pct = t.pts > 0 ? Math.min(100, totalPts > 0 ? Math.round((totalPts / t.pts) * 100) : 0) : 0;
       var rem = Math.max(0, t.pts - totalPts);
-      var reached = totalPts >= t.pts;
+      var reached = t.pts > 0 && totalPts >= t.pts;
       return '<tr>' +
         '<td><strong>' + t.name + '</strong></td>' +
         '<td>' + t.pts.toLocaleString() + '</td>' +
@@ -6768,7 +6839,7 @@ function renderPerformancePage() {
           agentTbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;">No point-based sales this month</td></tr>';
         } else {
           agentTbody.innerHTML = agentRows.map(function(a) {
-            var pct = Math.min(100, a.points > 0 ? Math.round((a.points / tiers.gate) * 100) : 0);
+            var pct = tiers.gate > 0 ? Math.min(100, a.points > 0 ? Math.round((a.points / tiers.gate) * 100) : 0) : 0;
             var tier = getKpiTierLabel(a.points, 'agent');
             return '<tr>' +
               '<td>' + esc(a.name) + '</td>' +
