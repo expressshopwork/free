@@ -393,7 +393,7 @@ function syncDownAll() {
   if (btn) btn.disabled = true;
 
   var sheets = [
-    { name: 'Sales',        lsKey: LS_KEYS.sales,        assign: function(d) { saleRecords = d; } },
+    { name: 'Sales',        lsKey: LS_KEYS.sales,        assign: function(d) { saleRecords = d.map(normalizeSaleRecord); } },
     { name: 'Customers',    lsKey: LS_KEYS.customers,    assign: function(d) { newCustomers = d; } },
     { name: 'TopUp',        lsKey: LS_KEYS.topup,        assign: function(d) { topUpList = d; } },
     { name: 'Terminations', lsKey: LS_KEYS.terminations, assign: function(d) { terminationList = d; } },
@@ -608,7 +608,7 @@ function saveAllData() {
 
 function loadAllData() {
   itemCatalogue = lsLoad(LS_KEYS.items, itemCatalogue);
-  saleRecords = lsLoad(LS_KEYS.sales, saleRecords);
+  saleRecords = lsLoad(LS_KEYS.sales, saleRecords).map(normalizeSaleRecord);
   newCustomers = lsLoad(LS_KEYS.customers, newCustomers);
   topUpList = lsLoad(LS_KEYS.topup, topUpList);
   terminationList = lsLoad(LS_KEYS.terminations, terminationList);
@@ -2669,7 +2669,9 @@ function renderDashboardKpiSection() {
   var kpiData = relevantKpis.map(function(k) {
     var assignee = staffList.find(function(u) { return u.id === k.assigneeId; });
     var actual = calcKpiActual(k);
-    var pct = k.target > 0 ? Math.round(actual / k.target * 100) : 0;
+    var isPoint = k.kpiMode === 'point';
+    var gateTarget = (isPoint && k.pointTiers) ? (k.pointTiers.gate || 0) : k.target;
+    var pct = gateTarget > 0 ? Math.round(actual / gateTarget * 100) : 0;
     return { k: k, assignee: assignee, actual: Math.round(actual * 100) / 100, pct: pct };
   });
 
@@ -2691,9 +2693,12 @@ function renderDashboardKpiSection() {
         ? '<span class="pill pill-blue" style="font-size:.7rem;padding:2px 7px;">Shop</span>'
         : '<span class="pill pill-orange" style="font-size:.7rem;padding:2px 7px;">Agent</span>';
       var assigneeName = d.assignee ? esc(d.assignee.name) : (d.k.assigneeBranch ? esc(d.k.assigneeBranch) : '—');
-      var valueDisplay = d.k.valueMode === 'currency'
-        ? fmtMoney(d.k.target, esc(d.k.currency) + ' ') + ' / ' + fmtMoney(d.actual, esc(d.k.currency) + ' ')
-        : (function() { var ul = getKpiUnitLabel(d.k); return d.k.target + ' / ' + d.actual + (ul ? ' ' + esc(ul) : ''); })();
+      var isPointGauge = d.k.kpiMode === 'point';
+      var valueDisplay = (isPointGauge && d.k.pointTiers)
+        ? d.actual + ' / ' + (d.k.pointTiers.gate || 0) + ' pts'
+        : d.k.valueMode === 'currency'
+          ? fmtMoney(d.k.target, esc(d.k.currency) + ' ') + ' / ' + fmtMoney(d.actual, esc(d.k.currency) + ' ')
+          : (function() { var ul = getKpiUnitLabel(d.k); return d.k.target + ' / ' + d.actual + (ul ? ' ' + esc(ul) : ''); })();
       return '<div class="kpi-gauge-card">' +
         '<div class="kpi-gauge-canvas-wrap">' +
         '<canvas id="kpiGauge_' + i + '" height="130"></canvas>' +
@@ -2751,9 +2756,11 @@ function renderDashboardKpiSection() {
         : '<span class="pill pill-teal" style="font-size:.7rem;"><i class="fas fa-chart-bar"></i> Volume</span>';
       var forLabel = d.k.kpiFor === 'shop' ? '<span class="pill pill-blue">Shop</span>' : '<span class="pill pill-orange">Agent</span>';
       var assigneeName = d.assignee ? esc(d.assignee.name) : (d.k.assigneeBranch ? esc(d.k.assigneeBranch) : '—');
-      var valueDisplay = (!isPoint && d.k.valueMode === 'currency')
-        ? fmtMoney(d.k.target, esc(d.k.currency) + ' ') + ' / ' + fmtMoney(d.actual, esc(d.k.currency) + ' ')
-        : (function() { var ul = getKpiUnitLabel(d.k); return d.k.target + ' / ' + d.actual + (ul ? ' ' + esc(ul) : ''); })();
+      var valueDisplay = (isPoint && d.k.pointTiers)
+        ? d.actual + ' / ' + (d.k.pointTiers.gate || 0) + ' pts'
+        : (!isPoint && d.k.valueMode === 'currency')
+          ? fmtMoney(d.k.target, esc(d.k.currency) + ' ') + ' / ' + fmtMoney(d.actual, esc(d.k.currency) + ' ')
+          : (function() { var ul = getKpiUnitLabel(d.k); return d.k.target + ' / ' + d.actual + (ul ? ' ' + esc(ul) : ''); })();
       return '<tr>' +
         '<td>' + esc(d.k.name) + '</td>' +
         '<td>' + modePill + '</td>' +
@@ -3871,6 +3878,21 @@ function _resetDenomSection() {
 // `creditAmount` field and the legacy `credit` field for backward compatibility.
 function _depCreditAmt(deposit) {
   return deposit.creditAmount !== undefined ? deposit.creditAmount : (deposit.credit || 0);
+}
+
+// Normalizes a point-based sale record after reading from Google Sheets or
+// localStorage, ensuring numeric fields (kpiAmount, kpiPoints) are stored as
+// numbers rather than the strings that the Sheets API returns for numeric cells.
+function normalizeSaleRecord(s) {
+  if (!s || typeof s !== 'object') return s;
+  var out = Object.assign({}, s);
+  if (out.kpiAmount !== undefined && out.kpiAmount !== '') {
+    out.kpiAmount = parseFloat(out.kpiAmount) || 0;
+  }
+  if (out.kpiPoints !== undefined && out.kpiPoints !== '') {
+    out.kpiPoints = parseFloat(out.kpiPoints) || 0;
+  }
+  return out;
 }
 
 // Normalizes a deposit record to ensure all required fields are present.
