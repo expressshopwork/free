@@ -1573,18 +1573,38 @@ function deleteSale(id) {
 
 /**
  * Append a single sale record to the DailySale sheet via the Apps Script
- * 'append' action.  The Apps Script handler flattens nested items and
- * dollarItems into individual columns.
+ * 'append' action.  The flat object is built with a fixed column order so
+ * that every row uses the same schema regardless of sale type:
+ *   A-G: shared fields (id … note)
+ *   H: kpiService   – populated for point sales, empty for unit sales
+ *   I: kpiAmount    – populated for point sales, empty for unit sales
+ *   J: revenue      – populated for unit sales, 0 for point sales
+ *   K: kpiPoints    – populated for point sales, 0 for unit sales
+ *   L: customerPhone
+ *   M: items        – JSON string for unit sales, empty for point sales
+ *   N: dollarItems  – JSON string for unit sales, empty for point sales
  */
 function appendDailySale(record) {
   if (!GS_URL || !record) return;
-  var flat = normalizeRowForSheet(record);
-  // Add top-level revenue and kpiPoints fields so Google Sheets shows readable numbers
-  // instead of the JSON-stringified dollarItems object.
-  flat.revenue = (record.dollarItems && record.dollarItems[ITEM_ID_REVENUE])
-    ? record.dollarItems[ITEM_ID_REVENUE]
-    : 0;
-  flat.kpiPoints = record.kpiPoints || 0;
+  var isPoint = record.transactionType === 'point';
+  var flat = {
+    id:            record.id || '',
+    transactionType: record.transactionType || '',
+    agent:         record.agent || '',
+    branch:        record.branch || '',
+    date:          record.date || '',
+    submittedAt:   record.submittedAt || '',
+    note:          record.note || '',
+    kpiService:    record.kpiService || '',
+    kpiAmount:     record.kpiAmount || '',
+    revenue:       (record.dollarItems && record.dollarItems[ITEM_ID_REVENUE])
+                     ? record.dollarItems[ITEM_ID_REVENUE]
+                     : 0,
+    kpiPoints:     record.kpiPoints || 0,
+    customerPhone: record.customerPhone || '',
+    items:         isPoint ? '' : JSON.stringify(record.items || {}),
+    dollarItems:   isPoint ? '' : JSON.stringify(record.dollarItems || {})
+  };
   _gsPost({ sheet: 'DailySale', action: 'append', data: flat })
     .catch(function(err) { console.warn('DailySale append error:', err); });
 }
