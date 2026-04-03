@@ -6,7 +6,14 @@
 // Deploy as a Web App:
 //   Execute as: Me
 //   Who has access: Anyone
+//
+// ── CONFIGURATION ────────────────────────────────────────────
+// Set this to your Google Spreadsheet ID (the long string in
+// the sheet URL between /d/ and /edit).
+// This is the FALLBACK used when the request does NOT include
+// a spreadsheetId in the POST body.
 // ============================================================
+var FALLBACK_SPREADSHEET_ID = '15HggDixs1lC0rer1msSOyuQZJXSgqC0zielcMbCDgCE';
 
 /**
  * GET handler – health check / sanity ping.
@@ -33,16 +40,17 @@ function doPost(e) {
     var action    = body.action;
     var data      = body.data;
 
-    // Use the supplied spreadsheet ID when available so that all user roles
-    // (admin, supervisor, agent) always write to the same target spreadsheet,
-    // even if their browser resolved a different GAS deployment URL.
+    // Resolve the target spreadsheet:
+    //   1. Use the spreadsheetId from the POST body (sent by app.js).
+    //   2. Fall back to the hardcoded FALLBACK_SPREADSHEET_ID constant above.
+    //   3. Last resort: the script's bound spreadsheet (getActiveSpreadsheet).
+    var targetId = body.spreadsheetId || FALLBACK_SPREADSHEET_ID;
     var ss;
-    if (body.spreadsheetId) {
+    if (targetId) {
       try {
-        ss = SpreadsheetApp.openById(body.spreadsheetId);
+        ss = SpreadsheetApp.openById(targetId);
       } catch (openErr) {
-        // openById failed (e.g. permission error) — log and fall back to the bound spreadsheet
-        console.error('openById failed for id=' + body.spreadsheetId + ': ' + openErr.toString());
+        console.error('openById failed for id=' + targetId + ': ' + openErr.toString());
         ss = SpreadsheetApp.getActiveSpreadsheet();
       }
     } else {
