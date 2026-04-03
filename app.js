@@ -54,12 +54,9 @@ const KNOWN_CURS = ['USD','KHR','THB','VND'];
 const KNOWN_UNITS = ['Unit','SIM','GB','MB','Minutes','SMS','Voucher'];
 const GAS_URL_PREFIX = 'https://script.google.com/macros/s/';
 const SYNCED_SHEETS = ['DailySale','Customers','TopUp','Terminations','OutCoverage','Promotions','Deposits','KPI','Items','Coverage','Staff'];
-// Target spreadsheet ID — included in every GAS request so all roles (admin,
-// supervisor, agent) always write to the same spreadsheet, regardless of which
-// GAS deployment URL a given browser has cached in localStorage.
-// Note: this identifier is safe to include in client-side code for a team-internal
-// tool — it merely names the destination; the GAS script enforces all write access.
-const SPREADSHEET_ID = '15HggDixs1lC0rer1msSOyuQZJXSgqC0zielcMbCDgCE';
+// Target spreadsheet ID — set this to your Google Spreadsheet ID to enable sync.
+// You can also set it at runtime via the Google Sheets settings panel.
+const SPREADSHEET_ID = '';
 
 // Item ID constants for key KPI calculations
 const ITEM_ID_REVENUE = 'i8';
@@ -153,7 +150,7 @@ function getKpiTierLabel(points, role) {
 const SUPPORT_CONTACT = { email: 'support@smart5g.com', phone: '+855 23 123 456' };
 
 // ── Google Sheets Sync ──────────────────────────────────────
-const GS_URL_DEFAULT = 'https://script.google.com/macros/s/AKfycbxokMtXAEvhyUrtfCSFCDmmdv6Cr6rOFVxkBxtH_eUbQc4okwCcVNVVvOv02nmanfPdTA/exec';
+const GS_URL_DEFAULT = '';
 // Runtime URL — loaded from localStorage on startup; falls back to the default above.
 var gsUrl = (function() {
   try { return localStorage.getItem('smart5g_gas_url') || GS_URL_DEFAULT; } catch(e) { return GS_URL_DEFAULT; }
