@@ -44,12 +44,14 @@ var _approvalFormData = null;
 var _sigCanvas = null, _sigCtx = null, _sigDrawing = false;
 
 // Constants
-const TAB_PERM = { admin: ['permission'], cluster: ['permission'], supervisor: [], agent: [], user: [] };
-const TAB_LBL = { permission: 'Permission' };
+const TAB_PERM = { admin: ['permission', 'google-sheets'], cluster: ['permission'], supervisor: [], agent: [], user: [] };
+const TAB_LBL = { permission: 'Permission', 'google-sheets': 'Google Sheets' };
 const AV_COLORS = ['#E53935','#8E24AA','#1565C0','#00838F','#2E7D32','#F57F17','#4E342E','#37474F'];
 const CHART_PAL = ['#1B7D3D','#2196F3','#FF9800','#9C27B0','#F44336','#00BCD4','#FFEB3B','#795548'];
 const KNOWN_CURS = ['USD','KHR','THB','VND'];
 const KNOWN_UNITS = ['Unit','SIM','GB','MB','Minutes','SMS','Voucher'];
+const GAS_URL_PREFIX = 'https://script.google.com/macros/s/';
+const SYNCED_SHEETS = ['Sales','Customers','TopUp','Terminations','OutCoverage','Promotions','Deposits','KPI','Items','Coverage','Staff'];
 
 // Item ID constants for key KPI calculations
 const ITEM_ID_REVENUE = 'i8';
@@ -143,12 +145,16 @@ function getKpiTierLabel(points, role) {
 const SUPPORT_CONTACT = { email: 'support@smart5g.com', phone: '+855 23 123 456' };
 
 // ── Google Sheets Sync ──────────────────────────────────────
-const GS_URL = 'https://script.google.com/macros/s/AKfycbwv8kdASEnPxjQJ8-wvnIZ5_Ib7_suDDcYU46VPNeVE0WKJboAYQlq3TqrA1QsXu0Y/exec';
+const GS_URL_DEFAULT = 'https://script.google.com/macros/s/AKfycbwv8kdASEnPxjQJ8-wvnIZ5_Ib7_suDDcYU46VPNeVE0WKJboAYQlq3TqrA1QsXu0Y/exec';
+// Runtime URL — loaded from localStorage on startup; falls back to the default above.
+var gsUrl = (function() {
+  try { return localStorage.getItem('smart5g_gas_url') || GS_URL_DEFAULT; } catch(e) { return GS_URL_DEFAULT; }
+})();
 
 function _gsPost(payload, retries) {
-  if (!GS_URL) return Promise.resolve({});
+  if (!gsUrl) return Promise.resolve({});
   retries = retries === undefined ? 2 : retries;
-  return fetch(GS_URL, {
+  return fetch(gsUrl, {
     method: 'POST',
     body: JSON.stringify(payload)
   })
@@ -192,7 +198,7 @@ function isAdminUser(u) {
 }
 
 function fetchStaffFromSheet() {
-  if (!GS_URL) {
+  if (!gsUrl) {
     console.warn('[SYNC] No Google Sheets URL configured');
     return Promise.resolve();
   }
@@ -263,7 +269,7 @@ function normalizeArrayForSheet(dataArray) {
 }
 
 function syncSheet(sheetName, dataArray) {
-  if (!GS_URL) return;
+  if (!gsUrl) return;
   var ind = document.getElementById('gs-sync-indicator');
   var lbl = document.getElementById('gs-sync-status');
   if (ind) ind.className = 'syncing';
@@ -283,7 +289,7 @@ function syncSheet(sheetName, dataArray) {
 }
 
 function deleteFromSheet(sheetName, id) {
-  if (!GS_URL) return;
+  if (!gsUrl) return;
   _gsPost({ sheet: sheetName, action: 'delete', data: { id: id } })
     .catch(function(err) { console.warn('GS delete error:', err); });
 }
@@ -292,11 +298,11 @@ function deleteFromSheet(sheetName, id) {
 // Sends { sheet, action:'read' } via POST and accepts both a plain array
 // and a { status:'ok', data:[...] } envelope in the response.
 function readSheet(sheetName) {
-  if (!GS_URL) return Promise.resolve([]);
+  if (!gsUrl) return Promise.resolve([]);
 
   console.log('[SYNC] Reading sheet:', sheetName);
 
-  return fetch(GS_URL, {
+  return fetch(gsUrl, {
     method: 'POST',
     body: JSON.stringify({ sheet: sheetName, action: 'read' })
   })
@@ -333,7 +339,7 @@ function readSheet(sheetName) {
 // create any missing columns (e.g. status, approvedBy, approvedAt) in the
 // Deposits sheet if they were absent from an older sheet setup.
 function syncUpAll() {
-  if (!GS_URL) {
+  if (!gsUrl) {
     showToast('No sync URL configured.', 'error');
     return;
   }
@@ -381,7 +387,7 @@ function syncUpAll() {
 // then re-render the current page. Exposed globally so admin can call it from
 // the browser console or a "Sync Down" button.
 function syncDownAll() {
-  if (!GS_URL) {
+  if (!gsUrl) {
     showToast('No sync URL configured.', 'error');
     return Promise.resolve();
   }
@@ -543,7 +549,8 @@ const LS_KEYS = {
   promotions: 'smart5g_promotions',
   deposits: 'smart5g_deposits',
   coverage: 'smart5g_coverage',
-  session: 'smart5g_session'
+  session: 'smart5g_session',
+  gasUrl: 'smart5g_gas_url'
 };
 
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
@@ -968,7 +975,7 @@ function switchSettingsTab(tab) {
   // Update tab button states
   $$('.tab-btn').forEach(function(b) {
     if (b.getAttribute('data-tab') === tab) b.classList.add('active');
-    else if (['permission'].includes(b.getAttribute('data-tab'))) b.classList.remove('active');
+    else if (['permission', 'google-sheets'].includes(b.getAttribute('data-tab'))) b.classList.remove('active');
   });
   const tc = g('stab-content-' + tab);
   if (tc) tc.classList.add('active');
@@ -985,7 +992,96 @@ function renderAccessContent(tab) {
     }
   } else {
     if (tab === 'permission') renderStaffTable();
+    if (tab === 'google-sheets') renderGoogleSheetsSettings();
   }
+}
+
+// ── Google Sheets Settings Panel ─────────────────────────────
+function renderGoogleSheetsSettings() {
+  var tc = g('stab-content-google-sheets');
+  if (!tc) return;
+  var current = gsUrl || GS_URL_DEFAULT;
+  var isDefault = current === GS_URL_DEFAULT;
+  tc.innerHTML =
+    '<div class="page-header">' +
+      '<h2 class="page-header-title">Google Sheets Integration</h2>' +
+    '</div>' +
+    '<div class="table-card" style="max-width:680px;">' +
+      '<div style="padding:20px 24px;">' +
+        '<p style="font-size:.875rem;color:#555;margin-bottom:18px;">' +
+          'Enter the Google Apps Script Web App URL that connects this dashboard to your Google Spreadsheet. ' +
+          'Deploy the <code>gas/Code.gs</code> script as a Web App (<em>Execute as: Me, Who has access: Anyone</em>), then paste the generated URL below.' +
+        '</p>' +
+        '<label style="display:block;font-weight:600;font-size:.875rem;color:#1A1A2E;margin-bottom:6px;" for="gs-url-input">' +
+          'GAS Web App URL' +
+        '</label>' +
+        '<div style="display:flex;gap:10px;align-items:center;">' +
+          '<input id="gs-url-input" type="url" class="form-input" style="flex:1;font-size:.8125rem;" ' +
+            'placeholder="https://script.google.com/macros/s/…/exec" ' +
+            'value="' + escHtml(current) + '" />' +
+          '<button class="btn btn-primary" onclick="saveGasUrl()">' +
+            '<i class="fas fa-floppy-disk"></i> Save' +
+          '</button>' +
+        '</div>' +
+        (isDefault
+          ? '<p style="font-size:.75rem;color:#888;margin-top:8px;"><i class="fas fa-circle-info" style="color:#1B7D3D;margin-right:4px;"></i>Currently using the default URL.</p>'
+          : '<p style="font-size:.75rem;color:#1B7D3D;margin-top:8px;"><i class="fas fa-circle-check" style="margin-right:4px;"></i>Custom URL saved in this browser.</p>') +
+        '<hr style="margin:20px 0;border:none;border-top:1px solid #e8ecf0;" />' +
+        '<p style="font-weight:600;font-size:.875rem;color:#1A1A2E;margin-bottom:10px;">Sheets synced by this dashboard</p>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:8px;">' +
+          SYNCED_SHEETS.map(function(s) {
+            return '<span style="background:#e8f5e9;color:#1B7D3D;border-radius:4px;padding:3px 10px;font-size:.8125rem;font-weight:500;">' + s + '</span>';
+          }).join('') +
+        '</div>' +
+        '<hr style="margin:20px 0;border:none;border-top:1px solid #e8ecf0;" />' +
+        '<div style="display:flex;gap:12px;">' +
+          '<button class="btn btn-primary" onclick="syncDownAll()">' +
+            '<i class="fas fa-cloud-arrow-down"></i> Sync Down (Pull from Sheets)' +
+          '</button>' +
+          '<button class="btn btn-outline" onclick="syncUpAll()">' +
+            '<i class="fas fa-cloud-arrow-up"></i> Sync Up (Push to Sheets)' +
+          '</button>' +
+        '</div>' +
+        '<div style="margin-top:12px;">' +
+          '<button class="btn btn-outline" style="color:#888;border-color:#ddd;font-size:.8125rem;" onclick="resetGasUrl()">' +
+            '<i class="fas fa-rotate-left"></i> Reset to Default URL' +
+          '</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function saveGasUrl() {
+  var input = g('gs-url-input');
+  if (!input) return;
+  var val = input.value.trim();
+  if (!val) {
+    showAlert('Please enter a valid URL.', 'error');
+    return;
+  }
+  if (!val.startsWith(GAS_URL_PREFIX)) {
+    showAlert('URL must start with ' + GAS_URL_PREFIX, 'error');
+    return;
+  }
+  gsUrl = val;
+  try { localStorage.setItem(LS_KEYS.gasUrl, val); } catch(e) { console.warn('Could not save GAS URL:', e); }
+  showToast('Google Sheets URL saved.', 'success');
+  renderGoogleSheetsSettings();
+}
+
+function resetGasUrl() {
+  gsUrl = GS_URL_DEFAULT;
+  try { localStorage.removeItem(LS_KEYS.gasUrl); } catch(e) {}
+  showToast('Reset to default Google Sheets URL.', 'success');
+  renderGoogleSheetsSettings();
 }
 
 function setPromoView(view) {
@@ -1019,7 +1115,10 @@ function openPromoSubMenu(view, el) {
 
 function openSettingsMenu(el) {
   navigateTo('settings', null);
-  switchSettingsTab('permission');
+  // Derive tab name from element id: 'nav-permission' → 'permission', 'nav-google-sheets' → 'google-sheets'
+  var tab = el && el.id ? el.id.replace(/^nav-/, '') : 'permission';
+  switchSettingsTab(tab);
+  renderAccessContent(tab);
   setActiveSubItem(el);
 }
 
@@ -1585,7 +1684,7 @@ function deleteSale(id) {
  *   N: dollarItems  – JSON string for unit sales, empty for point sales
  */
 function appendDailySale(record) {
-  if (!GS_URL || !record) return;
+  if (!gsUrl || !record) return;
   var isPoint = record.transactionType === 'point';
   var flat = {
     id:            record.id || '',
