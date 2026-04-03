@@ -199,7 +199,17 @@ function readSheetData(ss, sheetName) {
     var obj      = {};
     var hasValue = false;
     headers.forEach(function(h, i) {
-      var v = (row[i] === null || row[i] === undefined) ? '' : String(row[i]);
+      var raw = row[i];
+      var v;
+      if (raw === null || raw === undefined) {
+        v = '';
+      } else if (raw instanceof Date) {
+        // Google Sheets may auto-convert YYYY-MM-DD strings to Date objects.
+        // Format them back to YYYY-MM-DD so date comparisons in the app work correctly.
+        v = isNaN(raw.getTime()) ? '' : Utilities.formatDate(raw, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      } else {
+        v = String(raw);
+      }
       obj[h] = v;
       if (v !== '') hasValue = true;
     });
