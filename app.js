@@ -6886,10 +6886,9 @@ function renderPerformancePage() {
   var isSupervisor = (currentRole === 'supervisor');
   var agentName = (currentUser && !isAdmin && !isSupervisor) ? (currentUser.name || '') : '';
 
-  // Resolve tier thresholds: prefer active point-based KPI setting, fall back to KPI_TIERS constants
+  // Resolve tier thresholds from active point-based KPI setting; blank (null) if not yet configured
   var role = isSupervisor ? 'supervisor' : 'agent';
-  var fallbackTiers = KPI_TIERS[role];
-  var tiers = fallbackTiers; // default
+  var tiers = { min: null, gate: null, otb: null, oab: null }; // default: blank until KPI is set
 
   // Find a point-based KPI assigned to the current user's shop/branch
   var pointKpi = null;
@@ -6926,10 +6925,10 @@ function renderPerformancePage() {
 
   if (pointKpi && pointKpi.pointTiers) {
     tiers = {
-      min:  pointKpi.pointTiers.min  || fallbackTiers.min,
-      gate: pointKpi.pointTiers.gate || fallbackTiers.gate,
-      otb:  pointKpi.pointTiers.otb  || fallbackTiers.otb,
-      oab:  pointKpi.pointTiers.oab  || fallbackTiers.oab
+      min:  pointKpi.pointTiers.min  > 0 ? pointKpi.pointTiers.min  : null,
+      gate: pointKpi.pointTiers.gate > 0 ? pointKpi.pointTiers.gate : null,
+      otb:  pointKpi.pointTiers.otb  > 0 ? pointKpi.pointTiers.otb  : null,
+      oab:  pointKpi.pointTiers.oab  > 0 ? pointKpi.pointTiers.oab  : null
     };
   }
 
@@ -6938,8 +6937,8 @@ function renderPerformancePage() {
   var daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
   var dayOfMonth = today.getDate();
   var daysLeft = daysInMonth - dayOfMonth;
-  var remaining = Math.max(0, tiers.gate - totalPts);
-  var dailyReq = daysLeft > 0 ? Math.ceil(remaining / daysLeft) : remaining;
+  var remaining = tiers.gate != null ? Math.max(0, tiers.gate - totalPts) : null;
+  var dailyReq = remaining != null ? (daysLeft > 0 ? Math.ceil(remaining / daysLeft) : remaining) : null;
   var tierInfo = getKpiTierLabel(totalPts, role);
 
   // Update KPI cards
@@ -6951,11 +6950,11 @@ function renderPerformancePage() {
   var dailyEl = g('perf-daily-required');
   var tierEl = g('perf-tier-badge');
   if (totalEl) totalEl.textContent = totalPts % 1 === 0 ? totalPts.toString() : totalPts.toFixed(2);
-  if (minEl) minEl.textContent = tiers.min.toLocaleString();
-  if (gateEl) gateEl.textContent = tiers.gate.toLocaleString();
-  if (otbEl) otbEl.textContent = tiers.otb.toLocaleString();
-  if (oabEl) oabEl.textContent = tiers.oab.toLocaleString();
-  if (dailyEl) dailyEl.textContent = dailyReq > 0 ? dailyReq.toString() : '0';
+  if (minEl) minEl.textContent = tiers.min != null ? tiers.min.toLocaleString() : '-';
+  if (gateEl) gateEl.textContent = tiers.gate != null ? tiers.gate.toLocaleString() : '-';
+  if (otbEl) otbEl.textContent = tiers.otb != null ? tiers.otb.toLocaleString() : '-';
+  if (oabEl) oabEl.textContent = tiers.oab != null ? tiers.oab.toLocaleString() : '-';
+  if (dailyEl) dailyEl.textContent = dailyReq != null ? (dailyReq > 0 ? dailyReq.toString() : '0') : '-';
   if (tierEl) {
     tierEl.innerHTML = '<span class="tier-badge" style="background:' + tierInfo.color + ';color:#fff;padding:2px 10px;border-radius:12px;font-size:0.85rem;">' +
       tierInfo.label + '</span>';
@@ -6971,16 +6970,16 @@ function renderPerformancePage() {
       { name: 'OAB',  pts: tiers.oab  }
     ];
     tbody.innerHTML = tierRows.map(function(t) {
-      var pct = t.pts > 0 ? Math.min(100, totalPts > 0 ? Math.round((totalPts / t.pts) * 100) : 0) : 0;
-      var rem = Math.max(0, t.pts - totalPts);
-      var reached = t.pts > 0 && totalPts >= t.pts;
+      var pct = t.pts != null && t.pts > 0 ? Math.min(100, totalPts > 0 ? Math.round((totalPts / t.pts) * 100) : 0) : 0;
+      var rem = t.pts != null ? Math.max(0, t.pts - totalPts) : null;
+      var reached = t.pts != null && t.pts > 0 && totalPts >= t.pts;
       return '<tr>' +
         '<td><strong>' + t.name + '</strong></td>' +
-        '<td>' + t.pts.toLocaleString() + '</td>' +
+        '<td>' + (t.pts != null ? t.pts.toLocaleString() : '') + '</td>' +
         '<td>' + (totalPts % 1 === 0 ? totalPts.toString() : totalPts.toFixed(2)) + '</td>' +
-        '<td><div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:' + pct + '%;background:' + (reached ? '#4CAF50' : '#1B7D3D') + ';"></div></div> ' + pct + '%</td>' +
-        '<td>' + (reached ? '<span style="color:#4CAF50;">✓ Reached</span>' : rem.toFixed(1)) + '</td>' +
-        '<td><span class="status-badge ' + (reached ? 'status-active' : 'status-pending') + '">' + (reached ? 'Done' : 'Pending') + '</span></td>' +
+        '<td>' + (t.pts != null ? '<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:' + pct + '%;background:' + (reached ? '#4CAF50' : '#1B7D3D') + ';"></div></div> ' + pct + '%' : '') + '</td>' +
+        '<td>' + (t.pts != null ? (reached ? '<span style="color:#4CAF50;">✓ Reached</span>' : rem.toFixed(1)) : '') + '</td>' +
+        '<td><span class="status-badge ' + (reached ? 'status-active' : 'status-pending') + '">' + (reached ? 'Done' : 'In Progress') + '</span></td>' +
         '</tr>';
     }).join('');
   }
