@@ -1465,11 +1465,11 @@ function switchSaleModalType(type) {
 
 function updateKpiPointPreview() {
   var serviceId = rv('sale-kpi-service');
-  // Auto-fill amount=1 for unit-counted services (eSIM, Smart NAS Download)
-  if (serviceId === 'ks13' || serviceId === 'ks14') {
-    var amtInp = g('sale-kpi-amount');
-    if (amtInp && amtInp.value === '') amtInp.value = '1';
-  }
+  var amtInp = g('sale-kpi-amount');
+  // eSIM and Smart NAS Download count as 1 unit transaction, not a dollar amount
+  var isUnitCounted = (serviceId === 'ks13' || serviceId === 'ks14');
+  if (amtInp) amtInp.required = !isUnitCounted;
+  if (isUnitCounted && amtInp && amtInp.value === '') amtInp.value = '1';
   var amount = rv('sale-kpi-amount');
   var pts = calcKpiPoints(serviceId, amount);
   var el = g('kpi-points-value');
@@ -1624,6 +1624,8 @@ function submitSale(e) {
     var kpiAmount = parseFloat(rv('sale-kpi-amount')) || 0;
     var customerPhone = rv('sale-kpi-phone');
     if (!kpiService) { showAlert('Please select a service type'); return; }
+    // eSIM and Smart NAS Download count as 1 unit transaction, not a dollar amount
+    if ((kpiService === 'ks13' || kpiService === 'ks14') && kpiAmount <= 0) { kpiAmount = 1; }
     if (kpiAmount <= 0) { showAlert('Please enter a valid amount'); return; }
     var kpiPoints = calcKpiPoints(kpiService, kpiAmount);
     obj = {
