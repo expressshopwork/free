@@ -1025,7 +1025,7 @@ function renderAccessContent(tab) {
       tc.innerHTML = '<div class="access-denied"><i class="fas fa-lock fa-3x" style="color:#BDBDBD;margin-bottom:12px;"></i><h3 style="color:#555;">Access Denied</h3><p style="color:#999;">You do not have permission to access this section.</p></div>';
     }
   } else {
-    if (tab === 'permission') renderStaffTable();
+    if (tab === 'permission') { renderStaffTable(); loadPendingFirebaseUsers(); }
     if (tab === 'google-sheets') renderGoogleSheetsSettings();
   }
 }
@@ -5445,23 +5445,206 @@ function toggleSidebar() {
 }
 
 // ------------------------------------------------------------
-// Social Login
+// Firebase Google Sign-In
 // ------------------------------------------------------------
+function loginWithGoogle() {
+  if (!window.firebaseAuth || !window.googleProvider) {
+    showAlert('Firebase is not initialized yet. Please reload the page and try again.', 'error');
+    return;
+  }
+  window.fbSignInWithPopup(window.firebaseAuth, window.googleProvider)
+    .then(function(result) {
+      handleFirebaseUser(result.user);
+    })
+    .catch(function(err) {
+      if (err.code !== 'auth/popup-closed-by-user') {
+        showAlert('Google sign-in failed: ' + err.message, 'error');
+      }
+    });
+}
+
 function loginWithSocial(provider) {
+  if (provider === 'google') { loginWithGoogle(); return; }
   if (provider === 'telegram') {
     window.open('https://t.me/saray2026123', '_blank', 'noopener,noreferrer');
     return;
   }
-  if (provider === 'phone') {
-    openModal('modal-phone-login');
+  if (provider === 'phone') { openModal('modal-phone-login'); return; }
+  var names = { facebook: 'Facebook' };
+  showAlert(
+    'To register with ' + (names[provider] || provider) + ', please contact the admin on Telegram:\n\n@saray2026123',
+    'info',
+    'Register with ' + (names[provider] || provider)
+  );
+}
+
+function handleFirebaseUser(fbUser) {
+  if (!fbUser) return;
+  var db = window.firebaseDb;
+  var docRef = window.fbDoc(db, 'users', fbUser.uid);
+  window.fbGetDoc(docRef).then(function(snap) {
+    if (!snap.exists()) {
+      // Brand-new user — show profile completion modal
+      showGoogleSignupModal(fbUser);
+    } else {
+      var profile = snap.data();
+      if (profile.status === 'active') {
+        loginFirebaseUser(fbUser, profile);
+      } else if (profile.status === 'rejected') {
+        window.fbSignOut(window.firebaseAuth);
+        showAlert('Your account request was rejected. Contact @saray2026123 on Telegram for help.', 'error', 'Access Denied');
+      } else {
+        showPendingScreen();
+      }
+    }
+  }).catch(function(err) {
+    showAlert('Error loading your profile: ' + err.message, 'error');
+  });
+}
+
+function showGoogleSignupModal(fbUser) {
+  var nameEl  = document.getElementById('google-signup-name');
+  var emailEl = document.getElementById('google-signup-email');
+  var avatarEl = document.getElementById('google-signup-avatar');
+  if (nameEl)  nameEl.textContent  = fbUser.displayName || '';
+  if (emailEl) emailEl.textContent = fbUser.email || '';
+  if (avatarEl && fbUser.photoURL) avatarEl.src = fbUser.photoURL;
+
+  // Populate branch dropdown
+  var branchSel = document.getElementById('google-signup-branch');
+  if (branchSel) {
+    var allBranches = typeof getBranches === 'function' ? getBranches() : SMART_SHOPS;
+    branchSel.innerHTML = '<option value="">Select branch</option>' +
+      allBranches.map(function(b) { return '<option value="' + b + '">' + b + '</option>'; }).join('');
+  }
+
+  // Store reference for submit
+  window._pendingFirebaseUser = fbUser;
+
+  var modal = document.getElementById('modal-google-signup');
+  if (modal) modal.style.display = 'flex';
+}
+
+function onGoogleSignupRoleChange() {
+  var role = document.getElementById('google-signup-role') ? document.getElementById('google-signup-role').value : '';
+  var branchGroup = document.getElementById('google-signup-branch-group');
+  // Admin and Cluster don't need a branch
+  if (branchGroup) {
+    branchGroup.style.display = (role === 'Admin' || role === 'Cluster') ? 'none' : 'block';
+  }
+}
+
+function submitGoogleSignup() {
+  var fbUser = window._pendingFirebaseUser;
+  if (!fbUser) return;
+
+  var role   = document.getElementById('google-signup-role')   ? document.getElementById('google-signup-role').value.trim()   : '';
+  var branch = document.getElementById('google-signup-branch') ? document.getElementById('google-signup-branch').value.trim() : '';
+  var errEl  = document.getElementById('google-signup-error');
+
+  if (!role) {
+    if (errEl) { errEl.textContent = 'Please select a role.'; errEl.style.display = 'block'; }
     return;
   }
-  var names = { facebook: 'Facebook', google: 'Google' };
-  showAlert(
-    'To register with ' + names[provider] + ', please contact the admin on Telegram:\n\n@saray2026123\n\nThey will help set up your account.',
-    'info',
-    'Register with ' + names[provider]
-  );
+  if ((role !== 'Admin' && role !== 'Cluster') && !branch) {
+    if (errEl) { errEl.textContent = 'Please select a branch.'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (errEl) errEl.style.display = 'none';
+
+  var isAdmin = role === 'Admin';
+  var profile = {
+    uid:       fbUser.uid,
+    name:      fbUser.displayName || fbUser.email,
+    email:     fbUser.email,
+    photoURL:  fbUser.photoURL || '',
+    role:      role,
+    branch:    branch,
+    status:    isAdmin ? 'active' : 'pending',
+    createdAt: new Date().toISOString()
+  };
+
+  var db = window.firebaseDb;
+  window.fbSetDoc(window.fbDoc(db, 'users', fbUser.uid), profile)
+    .then(function() {
+      var modal = document.getElementById('modal-google-signup');
+      if (modal) modal.style.display = 'none';
+      window._pendingFirebaseUser = null;
+      if (isAdmin) {
+        loginFirebaseUser(fbUser, profile);
+      } else {
+        showPendingScreen();
+      }
+    })
+    .catch(function(err) {
+      if (errEl) { errEl.textContent = 'Failed to save profile: ' + err.message; errEl.style.display = 'block'; }
+    });
+}
+
+function loginFirebaseUser(fbUser, profile) {
+  // Map Firebase profile to the app's currentUser structure
+  currentUser = {
+    id:       fbUser.uid,
+    name:     profile.name || fbUser.displayName || fbUser.email,
+    username: fbUser.email,
+    email:    fbUser.email,
+    role:     profile.role,
+    branch:   profile.branch || '',
+    status:   'active',
+    photoURL: profile.photoURL || ''
+  };
+
+  var roleMap = { Admin: 'admin', Cluster: 'cluster', Supervisor: 'supervisor', Agent: 'agent' };
+  currentRole = roleMap[profile.role] || 'agent';
+
+  // Save session
+  try { localStorage.setItem(LS_KEYS.session, JSON.stringify({ user: currentUser, role: currentRole, ts: Date.now() })); } catch(e) {}
+
+  // Hide login, show app
+  var ls = document.getElementById('login-screen'); if (ls) ls.style.display = 'none';
+  var ps = document.getElementById('pending-screen'); if (ps) ps.style.display = 'none';
+  var as = document.getElementById('app-shell'); if (as) as.style.display = 'flex';
+
+  // Update topbar
+  var nameEl   = document.getElementById('topbar-name');   if (nameEl)   nameEl.textContent = currentUser.name;
+  var roleEl   = document.getElementById('topbar-role');
+  var roleColors = { admin: '#1B7D3D', cluster: '#6A1B9A', supervisor: '#1565C0', agent: '#E65100' };
+  var roleBadges = { admin: 'Admin', cluster: 'Cluster', supervisor: 'Supervisor', agent: 'Agent' };
+  if (roleEl) { roleEl.textContent = roleBadges[currentRole] || currentRole; roleEl.style.background = roleColors[currentRole] || '#888'; }
+  var avatarEl = document.getElementById('topbar-avatar');
+  if (avatarEl) {
+    if (currentUser.photoURL) {
+      avatarEl.textContent = '';
+      var img = document.createElement('img');
+      img.setAttribute('src', currentUser.photoURL);
+      img.setAttribute('style', 'width:100%;height:100%;border-radius:50%;object-fit:cover;');
+      avatarEl.appendChild(img);
+    } else {
+      avatarEl.textContent = ini(currentUser.name);
+    }
+  }
+
+  startSessionTimer();
+  applyRolePermissions(currentRole);
+  navigateTo('dashboard', document.getElementById('nav-dashboard'));
+  syncDownAll();
+}
+
+function showPendingScreen() {
+  var ls = document.getElementById('login-screen'); if (ls) ls.style.display = 'none';
+  var ps = document.getElementById('pending-screen'); if (ps) { ps.style.display = 'flex'; }
+}
+
+function signOutFirebase() {
+  if (window.firebaseAuth && window.fbSignOut) {
+    window.fbSignOut(window.firebaseAuth).catch(function() {});
+  }
+  currentUser = null;
+  currentRole = 'agent';
+  try { localStorage.removeItem(LS_KEYS.session); } catch(e) {}
+  var ps = document.getElementById('pending-screen'); if (ps) ps.style.display = 'none';
+  var as = document.getElementById('app-shell'); if (as) as.style.display = 'none';
+  var ls = document.getElementById('login-screen'); if (ls) ls.style.display = 'flex';
 }
 
 function submitPhoneLogin() {
@@ -7213,3 +7396,73 @@ function renderPerformancePage() {
     }
   }
 }
+
+// ------------------------------------------------------------
+// Firebase Pending Users — Admin Management
+// ------------------------------------------------------------
+function loadPendingFirebaseUsers() {
+  if (!window.firebaseDb) return;
+  var q = window.fbQuery(window.fbCollection(window.firebaseDb, 'users'), window.fbWhere('status', '==', 'pending'));
+  window.fbGetDocs(q).then(function(snap) {
+    var pending = [];
+    snap.forEach(function(d) { pending.push(Object.assign({ uid: d.id }, d.data())); });
+    renderPendingUsersTable(pending);
+  });
+}
+
+function renderPendingUsersTable(pending) {
+  var container = document.getElementById('pending-users-container');
+  if (!container) return;
+  if (!pending.length) {
+    container.innerHTML = '<p style="color:#999;font-size:.875rem;padding:16px 0;">No pending requests.</p>';
+    return;
+  }
+  container.innerHTML = '<div class="table-card"><div class="table-responsive"><table class="data-table"><thead><tr>' +
+    '<th>Name</th><th>Email</th><th>Role</th><th>Branch</th><th>Requested</th><th>Action</th>' +
+    '</tr></thead><tbody>' +
+    pending.map(function(u) {
+      return '<tr>' +
+        '<td>' + esc(u.name || '') + '</td>' +
+        '<td>' + esc(u.email || '') + '</td>' +
+        '<td>' + esc(u.role || '') + '</td>' +
+        '<td>' + esc(u.branch || '—') + '</td>' +
+        '<td>' + esc(u.createdAt ? u.createdAt.substring(0,10) : '') + '</td>' +
+        '<td style="display:flex;gap:6px;">' +
+          '<button class="btn btn-primary" style="font-size:.75rem;padding:4px 10px;" onclick="approveFirebaseUser(\'' + u.uid + '\')">' +
+            '<i class="fas fa-check"></i> Approve' +
+          '</button>' +
+          '<button class="btn btn-danger" style="font-size:.75rem;padding:4px 10px;" onclick="rejectFirebaseUser(\'' + u.uid + '\')">' +
+            '<i class="fas fa-times"></i> Reject' +
+          '</button>' +
+        '</td>' +
+      '</tr>';
+    }).join('') +
+    '</tbody></table></div></div>';
+}
+
+function approveFirebaseUser(uid) {
+  window.fbUpdateDoc(window.fbDoc(window.firebaseDb, 'users', uid), { status: 'active' })
+    .then(function() { showToast('User approved.', 'success'); loadPendingFirebaseUsers(); })
+    .catch(function(err) { showAlert('Failed: ' + err.message, 'error'); });
+}
+
+function rejectFirebaseUser(uid) {
+  showConfirm('Reject this user\'s access request?', function() {
+    window.fbUpdateDoc(window.fbDoc(window.firebaseDb, 'users', uid), { status: 'rejected' })
+      .then(function() { showToast('User rejected.', 'success'); loadPendingFirebaseUsers(); })
+      .catch(function(err) { showAlert('Failed: ' + err.message, 'error'); });
+  }, 'Reject User', 'Reject', true);
+}
+
+// ------------------------------------------------------------
+// Firebase Auto-restore session on page load
+// ------------------------------------------------------------
+window.addEventListener('load', function() {
+  if (!window.fbOnAuthStateChanged || !window.firebaseAuth) return;
+  window.fbOnAuthStateChanged(window.firebaseAuth, function(fbUser) {
+    if (!fbUser) return; // not signed in — nothing to do
+    // Only auto-login if no session is already active (avoid double-login)
+    if (currentUser) return;
+    handleFirebaseUser(fbUser);
+  });
+});

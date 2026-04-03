@@ -1,62 +1,39 @@
-// ============================================================
-// Firebase Configuration — Placeholder
-// ============================================================
-// To enable Firebase Authentication and Firestore, replace the
-// placeholder values below with your actual Firebase project
-// credentials from the Firebase Console:
-//   https://console.firebase.google.com/
-//
-// Steps:
-//   1. Create a Firebase project
-//   2. Enable Authentication (Google Sign-In provider)
-//   3. Enable Firestore Database
-//   4. Copy your web app's config from Project Settings
-//   5. Replace the values below
-//   6. Uncomment the initializeApp and export lines
-//
-// IMPORTANT: Do NOT commit real credentials to source control.
-// Use environment variables or a secrets manager in production.
-// ============================================================
+// firebase-config.js
+// Smart 5G Dashboard — Firebase Configuration
+// Deploy as: ES Module loaded via <script type="module"> in index.html
 
-const FIREBASE_CONFIG = {
-  apiKey:            "YOUR_API_KEY",
-  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId:         "YOUR_PROJECT_ID",
-  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId:             "YOUR_APP_ID"
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyDFlb0sO0S6PMzku8LIrMopFcHA5ohiBsg",
+  authDomain:        "smartdashboard-ae001.firebaseapp.com",
+  projectId:         "smartdashboard-ae001",
+  storageBucket:     "smartdashboard-ae001.firebasestorage.app",
+  messagingSenderId: "828088207222",
+  appId:             "1:828088207222:web:ed27dd97badcaacc8ddc57"
 };
 
-// Uncomment the lines below once you have real Firebase credentials:
-//
-// import { initializeApp } from "https://www.gstatic.com/firebasejs/10.x.x/firebase-app.js";
-// import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
-//   from "https://www.gstatic.com/firebasejs/10.x.x/firebase-auth.js";
-// import { getFirestore, collection, addDoc, getDocs, query, where, orderBy }
-//   from "https://www.gstatic.com/firebasejs/10.x.x/firebase-firestore.js";
-//
-// const app  = initializeApp(FIREBASE_CONFIG);
-// const auth = getAuth(app);
-// const db   = getFirestore(app);
-// const googleProvider = new GoogleAuthProvider();
-//
-// Firestore Security Rules (deploy via Firebase CLI):
-// rules_version = '2';
-// service cloud.firestore {
-//   match /databases/{database}/documents {
-//     match /transactions/{doc} {
-//       allow read, write: if request.auth != null
-//         && request.auth.uid == resource.data.userId;   // agents: own records only
-//     }
-//     match /transactions/{doc} {
-//       allow read: if request.auth != null
-//         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'supervisor'
-//         && resource.data.branch == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.branch;
-//     }
-//     match /kpiSettings/{doc} {
-//       allow read:  if request.auth != null;
-//       allow write: if request.auth != null
-//         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['supervisor','admin'];
-//     }
-//   }
-// }
+const _app  = initializeApp(firebaseConfig);
+const _auth = getAuth(_app);
+const _db   = getFirestore(_app);
+const _googleProvider = new GoogleAuthProvider();
+
+// Expose to global scope so non-module app.js can access
+window.firebaseAuth     = _auth;
+window.firebaseDb       = _db;
+window.googleProvider   = _googleProvider;
+window.fbSignInWithPopup    = signInWithPopup;
+window.fbSignOut            = signOut;
+window.fbOnAuthStateChanged = onAuthStateChanged;
+window.fbDoc        = doc;
+window.fbSetDoc     = setDoc;
+window.fbGetDoc     = getDoc;
+window.fbUpdateDoc  = updateDoc;
+window.fbCollection = collection;
+window.fbQuery      = query;
+window.fbWhere      = where;
+window.fbGetDocs    = getDocs;

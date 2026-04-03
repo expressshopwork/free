@@ -20,6 +20,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.fullscreen/2.4.0/Control.FullScreen.min.js" crossorigin="anonymous"></script>
   <link rel="stylesheet" href="style.css" />
+  <script type="module" src="firebase-config.js"></script>
   <style>
     /* ── Professional overrides ── */
     :root {
@@ -355,7 +356,7 @@
               <i class="fab fa-facebook-f"></i>
               <span>Facebook</span>
             </button>
-            <button class="login-social-btn login-social-google" onclick="loginWithSocial('google')" title="Sign in with Google">
+            <button class="login-social-btn login-social-google" onclick="loginWithGoogle()" title="Sign in with Google">
               <i class="fab fa-google"></i>
               <span>Google</span>
             </button>
@@ -406,6 +407,60 @@
         <button class="btn btn-outline" onclick="closeModal('modal-phone-login')">Cancel</button>
         <button class="btn btn-primary" onclick="submitPhoneLogin()"><i class="fas fa-paper-plane"></i> Submit Request</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Firebase Google Sign-Up: Complete Profile Modal -->
+  <div id="modal-google-signup" class="modal-overlay" style="display:none;">
+    <div class="modal" style="max-width:440px;">
+      <div class="modal-header">
+        <span class="modal-title"><i class="fab fa-google" style="color:#EA4335;margin-right:8px;"></i>Complete Your Profile</span>
+      </div>
+      <div class="modal-body">
+        <div id="google-signup-user-info" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:12px;background:#f8f9fa;border-radius:10px;">
+          <img id="google-signup-avatar" src="" alt="avatar" style="width:44px;height:44px;border-radius:50%;object-fit:cover;" />
+          <div>
+            <div id="google-signup-name" style="font-weight:700;font-size:.9375rem;color:#1A1A2E;"></div>
+            <div id="google-signup-email" style="font-size:.8125rem;color:#888;"></div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Role <span class="required">*</span></label>
+          <select class="form-select" id="google-signup-role" onchange="onGoogleSignupRoleChange()">
+            <option value="">Select role</option>
+            <option value="Admin">Admin</option>
+            <option value="Cluster">Cluster</option>
+            <option value="Supervisor">Supervisor</option>
+            <option value="Agent">Agent</option>
+          </select>
+        </div>
+        <div class="form-group" id="google-signup-branch-group">
+          <label class="form-label">Branch / Shop <span class="required">*</span></label>
+          <select class="form-select" id="google-signup-branch">
+            <option value="">Select branch</option>
+          </select>
+        </div>
+        <div id="google-signup-error" style="display:none;color:#C62828;font-size:.8125rem;margin-bottom:10px;padding:8px 12px;background:#FFEBEE;border-radius:8px;"></div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitGoogleSignup()">
+          <i class="fas fa-check"></i> Submit for Approval
+        </button>
+        <p style="font-size:.75rem;color:#999;text-align:center;margin-top:10px;">An admin will review and approve your account.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pending Approval Screen -->
+  <div id="pending-screen" style="display:none;position:fixed;inset:0;background:#F4F6F9;z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:20px;">
+    <div style="background:#fff;border-radius:16px;padding:40px;max-width:420px;width:90%;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+      <div style="width:64px;height:64px;background:#FFF8E1;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+        <i class="fas fa-clock" style="font-size:1.75rem;color:#F57F17;"></i>
+      </div>
+      <h2 style="font-size:1.25rem;font-weight:800;color:#1A1A2E;margin-bottom:8px;">Pending Approval</h2>
+      <p style="font-size:.875rem;color:#666;margin-bottom:20px;">Your account request has been submitted. Please wait for an admin to approve your access.</p>
+      <p style="font-size:.8125rem;color:#999;margin-bottom:24px;">Need help? Contact <a href="https://t.me/saray2026123" target="_blank" style="color:#229ED9;font-weight:600;">@saray2026123</a> on Telegram.</p>
+      <button class="btn btn-outline" onclick="signOutFirebase()" style="width:100%;justify-content:center;">
+        <i class="fas fa-right-from-bracket"></i> Sign Out
+      </button>
     </div>
   </div>
 
@@ -1352,6 +1407,12 @@
                 <tbody id="staff-table"></tbody>
               </table>
             </div>
+          </div>
+          <div class="page-header" style="margin-top:24px;">
+            <h2 class="page-header-title"><i class="fas fa-clock" style="color:#F57F17;margin-right:8px;"></i>Pending Firebase Requests</h2>
+          </div>
+          <div id="pending-users-container">
+            <p style="color:#999;font-size:.875rem;padding:16px 0;">No pending requests.</p>
           </div>
         </div>
 
