@@ -560,6 +560,10 @@
           <i class="fas fa-shield-halved submenu-icon"></i>
           <span>Permission</span>
         </li>
+        <li class="submenu-item" id="nav-google-sheets" onclick="openSettingsMenu(this)">
+          <i class="fas fa-table-cells submenu-icon"></i>
+          <span>Google Sheets</span>
+        </li>
       </ul>
 
     </ul>
@@ -1300,12 +1304,15 @@
         </div>
 
         <div class="tab-header">
-          <button class="tab-btn active" id="stab-permission" onclick="openSettingsTab('permission', this)">
+          <button class="tab-btn active" id="stab-permission" data-tab="permission" onclick="openSettingsTab('permission', this)">
             <i class="fas fa-shield-halved"></i> Permission
+          </button>
+          <button class="tab-btn" id="stab-google-sheets" data-tab="google-sheets" onclick="openSettingsTab('google-sheets', this)">
+            <i class="fas fa-table-cells"></i> Google Sheets
           </button>
         </div>
 
-        <div class="tab-content active" id="stab-content-permission">
+        <div class="tab-content active settings-tab-content" id="stab-content-permission">
           <div class="page-header">
             <h2 class="page-header-title">User Permissions</h2>
             <button class="btn btn-primary" onclick="openAddModal('user')">
@@ -1320,6 +1327,9 @@
               </table>
             </div>
           </div>
+        </div>
+
+        <div class="tab-content settings-tab-content" id="stab-content-google-sheets">
         </div>
 
       </section>
