@@ -8,7 +8,7 @@
 let currentRole = 'admin'; // 'admin', 'supervisor', 'user'
 let currentUser = null;
 let currentPage = 'dashboard';
-let currentSaleTab = 'report';
+let currentSaleTab = 'unit';
 let currentSaleModalType = 'unit'; // 'unit' or 'point'
 let currentCustomerTab = 'new-customer';
 let currentSettingsTab = 'permission';
@@ -888,7 +888,7 @@ function navigateTo(page, btn) {
     initSaleTracking();
   }
   if (page === 'deposit') { renderDepositTable(); updateDepositKpis(); }
-  if (page === 'sale') { renderItemChips(); applyReportFilters(); }
+  if (page === 'sale') { renderItemChips(); applyReportFilters(); applySaleTabTableVisibility(); }
   if (page === 'customer') {
     renderNewCustomerTable();
     renderTopUpTable();
@@ -929,16 +929,28 @@ function toggleSubmenu(id, elOrId) {
 }
 
 function openSaleTab(tab, btn) {
-  switchSaleTab(tab);
+  currentSaleTab = tab;
   $$('.sale-tab-btn').forEach(function(b) { b.classList.remove('active'); });
   if (btn) btn.classList.add('active');
+  // Show/hide KPI card groups
+  var unitKpi = g('sale-kpi-unit-cards');
+  var pointKpi = g('sale-kpi-point-cards');
+  if (unitKpi) unitKpi.style.display = (tab === 'unit') ? '' : 'none';
+  if (pointKpi) pointKpi.style.display = (tab === 'point') ? '' : 'none';
+  // Show/hide table cards (only matters in table view)
+  applySaleTabTableVisibility();
+}
+
+function applySaleTabTableVisibility() {
+  if (currentReportView !== 'table') return;
+  var unitCard = g('sale-unit-table-card');
+  var pointCard = g('sale-point-table-card');
+  if (unitCard) unitCard.style.display = (currentSaleTab === 'point') ? 'none' : '';
+  if (pointCard) pointCard.style.display = (currentSaleTab === 'unit') ? 'none' : '';
 }
 
 function switchSaleTab(tab) {
-  currentSaleTab = tab;
-  $$('.sale-tab-content').forEach(function(c) { c.classList.remove('active'); });
-  const tc = g('sale-tab-' + tab);
-  if (tc) tc.classList.add('active');
+  openSaleTab(tab, g('tab-sale-btn-' + tab));
 }
 
 function openCustomerTab(tab, btn) {
@@ -1517,8 +1529,13 @@ function openNewSaleModal(sale) {
 
   populateBranchSelects();
 
-  // Determine transaction type for this record
-  var editType = (sale && sale.transactionType === 'point') ? 'point' : 'unit';
+  // Determine transaction type: use the sale's type when editing, otherwise default to the active tab
+  var editType;
+  if (sale) {
+    editType = (sale.transactionType === 'point') ? 'point' : 'unit';
+  } else {
+    editType = (currentSaleTab === 'point') ? 'point' : 'unit';
+  }
   switchSaleModalType(editType);
 
   if (sale) {
@@ -1880,6 +1897,7 @@ function setReportView(view) {
   if (view === 'table') {
     if (tableCard) tableCard.style.display = '';
     if (summaryView) summaryView.style.display = 'none';
+    applySaleTabTableVisibility();
   } else {
     if (tableCard) tableCard.style.display = 'none';
     if (summaryView) summaryView.style.display = '';
