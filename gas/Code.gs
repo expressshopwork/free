@@ -17,7 +17,10 @@ function doGet(e) {
 
 /**
  * POST handler – main entry point.
- * Expected body: { sheet, action, data }
+ * Expected body: { sheet, action, data [, spreadsheetId] }
+ *   spreadsheetId (optional) – if supplied, targets that specific spreadsheet so every
+ *                               role's browser writes to the same sheet regardless of
+ *                               which GAS deployment URL is cached locally.
  *   action = 'sync'   → replace all rows with data[]
  *   action = 'read'   → return all rows as JSON array
  *   action = 'delete' → delete row where id === data.id
@@ -30,7 +33,21 @@ function doPost(e) {
     var action    = body.action;
     var data      = body.data;
 
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    // Use the supplied spreadsheet ID when available so that all user roles
+    // (admin, supervisor, agent) always write to the same target spreadsheet,
+    // even if their browser resolved a different GAS deployment URL.
+    var ss;
+    if (body.spreadsheetId) {
+      try {
+        ss = SpreadsheetApp.openById(body.spreadsheetId);
+      } catch (openErr) {
+        // openById failed (e.g. permission error) — log and fall back to the bound spreadsheet
+        console.error('openById failed for id=' + body.spreadsheetId + ': ' + openErr.toString());
+        ss = SpreadsheetApp.getActiveSpreadsheet();
+      }
+    } else {
+      ss = SpreadsheetApp.getActiveSpreadsheet();
+    }
 
     if (action === 'sync')      return syncSheetData(ss, sheetName, data);
     if (action === 'read')      return readSheetData(ss, sheetName);
