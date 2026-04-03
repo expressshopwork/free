@@ -13,7 +13,7 @@
 // This is the FALLBACK used when the request does NOT include
 // a spreadsheetId in the POST body.
 // ============================================================
-var FALLBACK_SPREADSHEET_ID = '15HggDixs1lC0rer1msSOyuQZJXSgqC0zielcMbCDgCE';
+var FALLBACK_SPREADSHEET_ID = '';
 
 /**
  * GET handler – health check / sanity ping.
