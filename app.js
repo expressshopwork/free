@@ -145,7 +145,7 @@ function getKpiTierLabel(points, role) {
 const SUPPORT_CONTACT = { email: 'support@smart5g.com', phone: '+855 23 123 456' };
 
 // ── Google Sheets Sync ──────────────────────────────────────
-const GS_URL_DEFAULT = 'https://script.google.com/macros/s/AKfycbwv8kdASEnPxjQJ8-wvnIZ5_Ib7_suDDcYU46VPNeVE0WKJboAYQlq3TqrA1QsXu0Y/exec';
+const GS_URL_DEFAULT = 'https://script.google.com/macros/s/AKfycbxokMtXAEvhyUrtfCSFCDmmdv6Cr6rOFVxkBxtH_eUbQc4okwCcVNVVvOv02nmanfPdTA/exec';
 // Runtime URL — loaded from localStorage on startup; falls back to the default above.
 var gsUrl = (function() {
   try { return localStorage.getItem('smart5g_gas_url') || GS_URL_DEFAULT; } catch(e) { return GS_URL_DEFAULT; }
