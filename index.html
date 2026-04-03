@@ -909,8 +909,11 @@
       <section class="page" id="page-sale">
 
         <div class="tab-header">
-          <button class="tab-btn active" id="tab-sale-report" onclick="openSaleTab('report', this)">
-            <i class="fas fa-chart-bar"></i> Report
+          <button class="tab-btn sale-tab-btn active" id="tab-sale-btn-unit" onclick="openSaleTab('unit', this)">
+            <i class="fas fa-boxes-stacked"></i> Unit Based
+          </button>
+          <button class="tab-btn sale-tab-btn" id="tab-sale-btn-point" onclick="openSaleTab('point', this)">
+            <i class="fas fa-star"></i> Point Based
           </button>
         </div>
 
@@ -944,27 +947,34 @@
           </button>
         </div>
 
-        <!-- Sale KPI Cards -->
-        <div class="kpi-grid">
-          <div class="kpi-card">
-            <div class="kpi-card-icon kpi-icon-purple"><i class="fas fa-sack-dollar"></i></div>
-            <div class="kpi-card-body"><p class="kpi-label">Total Revenue</p><p class="kpi-value" id="sale-kpi-revenue">$0</p></div>
+        <!-- Sale KPI Cards: Unit Based -->
+        <div id="sale-kpi-unit-cards">
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-card-icon kpi-icon-purple"><i class="fas fa-sack-dollar"></i></div>
+              <div class="kpi-card-body"><p class="kpi-label">Total Revenue</p><p class="kpi-value" id="sale-kpi-revenue">$0</p></div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card-icon kpi-icon-blue"><i class="fas fa-rotate"></i></div>
+              <div class="kpi-card-body"><p class="kpi-label">Total Recharge</p><p class="kpi-value" id="sale-kpi-recharge">$0</p></div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card-icon kpi-icon-orange"><i class="fas fa-signal"></i></div>
+              <div class="kpi-card-body"><p class="kpi-label">Total Gross Ads</p><p class="kpi-value" id="sale-kpi-gross-ads">0</p></div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card-icon kpi-icon-teal"><i class="fas fa-house-signal"></i></div>
+              <div class="kpi-card-body"><p class="kpi-label">Total Home Internet</p><p class="kpi-subtitle">Smart@Home + Smart Fiber+</p><p class="kpi-value" id="sale-kpi-home-internet">0</p></div>
+            </div>
           </div>
-          <div class="kpi-card">
-            <div class="kpi-card-icon kpi-icon-blue"><i class="fas fa-rotate"></i></div>
-            <div class="kpi-card-body"><p class="kpi-label">Total Recharge</p><p class="kpi-value" id="sale-kpi-recharge">$0</p></div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-card-icon kpi-icon-orange"><i class="fas fa-signal"></i></div>
-            <div class="kpi-card-body"><p class="kpi-label">Total Gross Ads</p><p class="kpi-value" id="sale-kpi-gross-ads">0</p></div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-card-icon kpi-icon-teal"><i class="fas fa-house-signal"></i></div>
-            <div class="kpi-card-body"><p class="kpi-label">Total Home Internet</p><p class="kpi-subtitle">Smart@Home + Smart Fiber+</p><p class="kpi-value" id="sale-kpi-home-internet">0</p></div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-card-icon kpi-icon-green"><i class="fas fa-star"></i></div>
-            <div class="kpi-card-body"><p class="kpi-label">Total KPI Points</p><p class="kpi-subtitle">Point-Based transactions</p><p class="kpi-value" id="sale-kpi-points">0</p></div>
+        </div>
+        <!-- Sale KPI Cards: Point Based -->
+        <div id="sale-kpi-point-cards" style="display:none;">
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-card-icon kpi-icon-green"><i class="fas fa-star"></i></div>
+              <div class="kpi-card-body"><p class="kpi-label">Total KPI Points</p><p class="kpi-subtitle">Point-Based transactions</p><p class="kpi-value" id="sale-kpi-points">0</p></div>
+            </div>
           </div>
         </div>
 
