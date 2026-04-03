@@ -59,7 +59,7 @@ const SYNCED_SHEETS = ['DailySale','Customers','TopUp','Terminations','OutCovera
 // GAS deployment URL a given browser has cached in localStorage.
 // Note: this identifier is safe to include in client-side code for a team-internal
 // tool — it merely names the destination; the GAS script enforces all write access.
-const SPREADSHEET_ID = '1K1cp9nhuHIu9iRGHCjk8hhjkL-CANfaC61qoEI-HT90';
+const SPREADSHEET_ID = '15HggDixs1lC0rer1msSOyuQZJXSgqC0zielcMbCDgCE';
 
 // Item ID constants for key KPI calculations
 const ITEM_ID_REVENUE = 'i8';
@@ -158,6 +158,10 @@ const GS_URL_DEFAULT = 'https://script.google.com/macros/s/AKfycbxokMtXAEvhyUrtf
 var gsUrl = (function() {
   try { return localStorage.getItem('smart5g_gas_url') || GS_URL_DEFAULT; } catch(e) { return GS_URL_DEFAULT; }
 })();
+const LS_SPREADSHEET_ID_KEY = 'smart5g_spreadsheet_id';
+var runtimeSpreadsheetId = (function() {
+  try { return localStorage.getItem(LS_SPREADSHEET_ID_KEY) || SPREADSHEET_ID; } catch(e) { return SPREADSHEET_ID; }
+})();
 
 function _gsPost(payload, retries) {
   if (!gsUrl) return Promise.resolve({});
@@ -165,7 +169,7 @@ function _gsPost(payload, retries) {
   // Always include the spreadsheet ID so every role writes to the same target sheet,
   // regardless of which GAS deployment URL is stored in this browser's localStorage.
   var body = Object.assign({}, payload);
-  body.spreadsheetId = SPREADSHEET_ID;
+  body.spreadsheetId = runtimeSpreadsheetId;
   return fetch(gsUrl, {
     method: 'POST',
     body: JSON.stringify(body)
@@ -315,7 +319,7 @@ function readSheet(sheetName) {
   console.log('[SYNC] Reading sheet:', sheetName);
 
   var body = { sheet: sheetName, action: 'read' };
-  body.spreadsheetId = SPREADSHEET_ID;
+  body.spreadsheetId = runtimeSpreadsheetId;
 
   return fetch(gsUrl, {
     method: 'POST',
@@ -1035,6 +1039,7 @@ function renderGoogleSheetsSettings() {
   if (!tc) return;
   var current = gsUrl || GS_URL_DEFAULT;
   var isDefault = current === GS_URL_DEFAULT;
+  var isDefaultSheetId = runtimeSpreadsheetId === SPREADSHEET_ID;
   tc.innerHTML =
     '<div class="page-header">' +
       '<h2 class="page-header-title">Google Sheets Integration</h2>' +
@@ -1059,6 +1064,34 @@ function renderGoogleSheetsSettings() {
         (isDefault
           ? '<p style="font-size:.75rem;color:#888;margin-top:8px;"><i class="fas fa-circle-info" style="color:#1B7D3D;margin-right:4px;"></i>Currently using the default URL.</p>'
           : '<p style="font-size:.75rem;color:#1B7D3D;margin-top:8px;"><i class="fas fa-circle-check" style="margin-right:4px;"></i>Custom URL saved in this browser.</p>') +
+        '<div style="margin-top:12px;">' +
+          '<button class="btn btn-outline" style="color:#888;border-color:#ddd;font-size:.8125rem;" onclick="resetGasUrl()">' +
+            '<i class="fas fa-rotate-left"></i> Reset to Default URL' +
+          '</button>' +
+        '</div>' +
+        '<hr style="margin:20px 0;border:none;border-top:1px solid #e8ecf0;" />' +
+        '<label style="display:block;font-weight:600;font-size:.875rem;color:#1A1A2E;margin-bottom:6px;" for="gs-sheet-id-input">' +
+          'Google Spreadsheet URL or ID' +
+        '</label>' +
+        '<p style="font-size:.8125rem;color:#555;margin-bottom:10px;">' +
+          'Paste the full Google Sheets URL (e.g. <code>https://docs.google.com/spreadsheets/d/\u2026/edit</code>) or just the spreadsheet ID. This tells the dashboard which spreadsheet to read from and write to.' +
+        '</p>' +
+        '<div style="display:flex;gap:10px;align-items:center;">' +
+          '<input id="gs-sheet-id-input" type="text" class="form-input" style="flex:1;font-size:.8125rem;" ' +
+            'placeholder="https://docs.google.com/spreadsheets/d/\u2026 or raw ID" ' +
+            'value="' + escHtml(runtimeSpreadsheetId) + '" />' +
+          '<button class="btn btn-primary" onclick="saveSpreadsheetId()">' +
+            '<i class="fas fa-floppy-disk"></i> Save' +
+          '</button>' +
+        '</div>' +
+        (isDefaultSheetId
+          ? '<p style="font-size:.75rem;color:#888;margin-top:8px;"><i class="fas fa-circle-info" style="color:#1B7D3D;margin-right:4px;"></i>Currently using the default Spreadsheet ID.</p>'
+          : '<p style="font-size:.75rem;color:#1B7D3D;margin-top:8px;"><i class="fas fa-circle-check" style="margin-right:4px;"></i>Custom Spreadsheet ID saved in this browser.</p>') +
+        '<div style="margin-top:12px;">' +
+          '<button class="btn btn-outline" style="color:#888;border-color:#ddd;font-size:.8125rem;" onclick="resetSpreadsheetId()">' +
+            '<i class="fas fa-rotate-left"></i> Reset to Default ID' +
+          '</button>' +
+        '</div>' +
         '<hr style="margin:20px 0;border:none;border-top:1px solid #e8ecf0;" />' +
         '<p style="font-weight:600;font-size:.875rem;color:#1A1A2E;margin-bottom:10px;">Sheets synced by this dashboard</p>' +
         '<div style="display:flex;flex-wrap:wrap;gap:8px;">' +
@@ -1073,11 +1106,6 @@ function renderGoogleSheetsSettings() {
           '</button>' +
           '<button class="btn btn-outline" onclick="syncUpAll()">' +
             '<i class="fas fa-cloud-arrow-up"></i> Sync Up (Push to Sheets)' +
-          '</button>' +
-        '</div>' +
-        '<div style="margin-top:12px;">' +
-          '<button class="btn btn-outline" style="color:#888;border-color:#ddd;font-size:.8125rem;" onclick="resetGasUrl()">' +
-            '<i class="fas fa-rotate-left"></i> Reset to Default URL' +
           '</button>' +
         '</div>' +
       '</div>' +
@@ -1114,6 +1142,49 @@ function resetGasUrl() {
   gsUrl = GS_URL_DEFAULT;
   try { localStorage.removeItem(LS_KEYS.gasUrl); } catch(e) {}
   showToast('Reset to default Google Sheets URL.', 'success');
+  renderGoogleSheetsSettings();
+}
+
+/**
+ * Extract the Google Spreadsheet ID from either:
+ *   - A full URL: https://docs.google.com/spreadsheets/d/<ID>/edit
+ *   - A raw ID string
+ * Returns the ID string, or null if it cannot be determined.
+ */
+function extractSheetId(input) {
+  if (!input) return null;
+  input = input.trim();
+  // Match /d/<id>/ pattern in a Google Sheets URL
+  var m = input.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  if (m) return m[1];
+  // Accept a raw ID (alphanumeric, dashes, underscores, 20–60 chars)
+  if (/^[a-zA-Z0-9_-]{20,60}$/.test(input)) return input;
+  return null;
+}
+
+function saveSpreadsheetId() {
+  var input = g('gs-sheet-id-input');
+  if (!input) return;
+  var val = input.value.trim();
+  if (!val) {
+    showAlert('Please enter a valid Spreadsheet URL or ID.', 'error');
+    return;
+  }
+  var id = extractSheetId(val);
+  if (!id) {
+    showAlert('Could not extract a valid Spreadsheet ID. Paste the full Google Sheets URL or the raw ID.', 'error');
+    return;
+  }
+  runtimeSpreadsheetId = id;
+  try { localStorage.setItem(LS_SPREADSHEET_ID_KEY, id); } catch(e) { console.warn('Could not save Spreadsheet ID:', e); }
+  showToast('Spreadsheet ID saved: ' + id, 'success');
+  renderGoogleSheetsSettings();
+}
+
+function resetSpreadsheetId() {
+  runtimeSpreadsheetId = SPREADSHEET_ID;
+  try { localStorage.removeItem(LS_SPREADSHEET_ID_KEY); } catch(e) {}
+  showToast('Reset to default Spreadsheet ID.', 'success');
   renderGoogleSheetsSettings();
 }
 
