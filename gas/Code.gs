@@ -77,7 +77,12 @@ function jsonResponse(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-/** Return the named sheet, creating it if it does not exist. */
+/**
+ * Return the named sheet, creating it (with a bold header placeholder)
+ * if it does not exist yet.
+ * Auto-creation ensures that a brand-new spreadsheet is bootstrapped
+ * on the very first request without any manual setup.
+ */
 function getOrCreateSheet(ss, sheetName) {
   var sheet = ss.getSheetByName(sheetName);
   if (!sheet) sheet = ss.insertSheet(sheetName);
@@ -191,10 +196,19 @@ function syncSheetData(ss, sheetName, data) {
 
 /**
  * read – Return all data rows as a JSON array of objects keyed by header name.
+ * Auto-creates the sheet tab if it does not exist yet (returns [] immediately).
+ * This bootstraps a blank sheet in a brand-new spreadsheet so subsequent
+ * sync / append calls can target the correct tab right away.
  */
 function readSheetData(ss, sheetName) {
+  // Auto-create the tab if missing so a new spreadsheet is bootstrapped on first read.
   var sheet = ss.getSheetByName(sheetName);
-  if (!sheet || sheet.getLastRow() < 2) return jsonResponse([]);
+  if (!sheet) {
+    ss.insertSheet(sheetName);
+    return jsonResponse([]);
+  }
+
+  if (sheet.getLastRow() < 2) return jsonResponse([]);
 
   var headers = getHeaders(sheet);
   if (headers.length === 0) return jsonResponse([]);
@@ -229,12 +243,18 @@ function readSheetData(ss, sheetName) {
 
 /**
  * delete – Remove the row whose 'id' column matches data.id.
+ * Returns ok (not an error) when the sheet does not exist yet —
+ * there is simply nothing to delete in a fresh spreadsheet.
  */
 function deleteRow(ss, sheetName, id) {
   if (!id) return jsonResponse({ status: 'error', message: 'No id provided.' });
 
   var sheet = ss.getSheetByName(sheetName);
-  if (!sheet) return jsonResponse({ status: 'error', message: 'Sheet not found: ' + sheetName });
+  // Auto-create the tab so the sheet is bootstrapped; nothing to delete yet.
+  if (!sheet) {
+    ss.insertSheet(sheetName);
+    return jsonResponse({ status: 'ok', message: 'Sheet was empty (auto-created).' });
+  }
 
   var headers  = getHeaders(sheet);
   var idColIdx = headers.indexOf('id');
@@ -276,8 +296,9 @@ function appendRow(ss, sheetName, data) {
  * updateRow – Update specific fields of the row whose 'id' column matches data.id.
  * Only the keys present in data (other than 'id') are written; all other columns
  * are left untouched.  New columns referenced in data are auto-created as needed.
+ * Auto-creates the sheet tab if missing (returns error since there is no row to update).
  *
- * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss
+ * @param {GoogleAppsScript.Spreadsheet} ss
  * @param {string} sheetName
  * @param {Object} data - Must contain 'id' plus whichever fields to update.
  */
@@ -285,7 +306,11 @@ function updateRow(ss, sheetName, data) {
   if (!data || !data.id) return jsonResponse({ status: 'error', message: 'No id provided.' });
 
   var sheet = ss.getSheetByName(sheetName);
-  if (!sheet) return jsonResponse({ status: 'error', message: 'Sheet not found: ' + sheetName });
+  // Auto-create the tab so the sheet is bootstrapped; nothing to update yet.
+  if (!sheet) {
+    ss.insertSheet(sheetName);
+    return jsonResponse({ status: 'error', message: 'Sheet was empty (auto-created). Row not found: ' + data.id });
+  }
 
   // Ensure any new columns referenced in data exist in the header row
   var headers = ensureHeaders(sheet, data);
