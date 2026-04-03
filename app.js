@@ -53,7 +53,7 @@ const CHART_PAL = ['#1B7D3D','#2196F3','#FF9800','#9C27B0','#F44336','#00BCD4','
 const KNOWN_CURS = ['USD','KHR','THB','VND'];
 const KNOWN_UNITS = ['Unit','SIM','GB','MB','Minutes','SMS','Voucher'];
 const GAS_URL_PREFIX = 'https://script.google.com/macros/s/';
-const SYNCED_SHEETS = ['Sales','Customers','TopUp','Terminations','OutCoverage','Promotions','Deposits','KPI','Items','Coverage','Staff'];
+const SYNCED_SHEETS = ['DailySale','Customers','TopUp','Terminations','OutCoverage','Promotions','Deposits','KPI','Items','Coverage','Staff'];
 // Target spreadsheet ID — included in every GAS request so all roles (admin,
 // supervisor, agent) always write to the same spreadsheet, regardless of which
 // GAS deployment URL a given browser has cached in localStorage.
@@ -366,7 +366,7 @@ function syncUpAll() {
   if (upBtn) upBtn.disabled = true;
 
   var sheets = [
-    { name: 'Sales',        data: function() { return saleRecords; } },
+    { name: 'DailySale',    data: function() { return saleRecords; } },
     { name: 'Customers',    data: function() { return newCustomers; } },
     { name: 'TopUp',        data: function() { return topUpList; } },
     { name: 'Terminations', data: function() { return terminationList; } },
@@ -414,7 +414,7 @@ function syncDownAll() {
   if (btn) btn.disabled = true;
 
   var sheets = [
-    { name: 'Sales',        lsKey: LS_KEYS.sales,        assign: function(d) { saleRecords = d.map(normalizeSaleRecord); } },
+    { name: 'DailySale',    lsKey: LS_KEYS.sales,        assign: function(d) { saleRecords = d.map(normalizeSaleRecord); } },
     { name: 'Customers',    lsKey: LS_KEYS.customers,    assign: function(d) { newCustomers = d; } },
     { name: 'TopUp',        lsKey: LS_KEYS.topup,        assign: function(d) { topUpList = d; } },
     { name: 'Terminations', lsKey: LS_KEYS.terminations, assign: function(d) { terminationList = d; } },
@@ -1688,8 +1688,7 @@ function submitSale(e) {
   applyReportFilters();
   if (currentPage === 'dashboard') renderDashboard();
   if (currentPage === 'performance') renderPerformancePage();
-  syncSheet('Sales', saleRecords);
-  if (!editId) appendDailySale(obj);
+  syncSheet('DailySale', saleRecords);
   saveAllData();
   showToast(editId ? 'Sale record updated.' : 'Sale record added successfully.', 'success');
 }
@@ -1709,48 +1708,10 @@ function deleteSale(id) {
     saleRecords = saleRecords.filter(function(x) { return x.id !== id; });
     applyReportFilters();
     if (currentPage === 'dashboard') renderDashboard();
-    syncSheet('Sales', saleRecords);
+    syncSheet('DailySale', saleRecords);
     saveAllData();
     showToast('Sale record deleted.', 'success');
   }, 'Delete Sale Record', 'Delete');
-}
-
-/**
- * Append a single sale record to the DailySale sheet via the Apps Script
- * 'append' action.  The flat object is built with a fixed column order so
- * that every row uses the same schema regardless of sale type:
- *   A-G: shared fields (id … note)
- *   H: kpiService   – populated for point sales, empty for unit sales
- *   I: kpiAmount    – populated for point sales, empty for unit sales
- *   J: revenue      – populated for unit sales, 0 for point sales
- *   K: kpiPoints    – populated for point sales, 0 for unit sales
- *   L: customerPhone
- *   M: items        – JSON string for unit sales, empty for point sales
- *   N: dollarItems  – JSON string for unit sales, empty for point sales
- */
-function appendDailySale(record) {
-  if (!gsUrl || !record) return;
-  var isPoint = record.transactionType === 'point';
-  var flat = {
-    id:            record.id || '',
-    transactionType: record.transactionType || '',
-    agent:         record.agent || '',
-    branch:        record.branch || '',
-    date:          record.date || '',
-    submittedAt:   record.submittedAt || '',
-    note:          record.note || '',
-    kpiService:    record.kpiService || '',
-    kpiAmount:     record.kpiAmount || '',
-    revenue:       (record.dollarItems && record.dollarItems[ITEM_ID_REVENUE])
-                     ? record.dollarItems[ITEM_ID_REVENUE]
-                     : 0,
-    kpiPoints:     record.kpiPoints || 0,
-    customerPhone: record.customerPhone || '',
-    items:         isPoint ? '' : JSON.stringify(record.items || {}),
-    dollarItems:   isPoint ? '' : JSON.stringify(record.dollarItems || {})
-  };
-  _gsPost({ sheet: 'DailySale', action: 'append', data: flat })
-    .catch(function(err) { console.warn('DailySale append error:', err); });
 }
 
 // ------------------------------------------------------------
