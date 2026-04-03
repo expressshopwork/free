@@ -4116,7 +4116,7 @@ function _resetDenomSection() {
 // Returns the credit amount from a deposit record, handling both the new
 // `creditAmount` field and the legacy `credit` field for backward compatibility.
 function _depCreditAmt(deposit) {
-  return deposit.creditAmount !== undefined ? deposit.creditAmount : (deposit.credit || 0);
+  return parseFloat(deposit.creditAmount !== undefined ? deposit.creditAmount : deposit.credit) || 0;
 }
 
 // Normalizes a sale record after reading from Google Sheets or localStorage,
@@ -4155,13 +4155,16 @@ function normalizeDeposit(d) {
     return d;
   }
   var out = Object.assign({}, d);
+  // Convert numeric fields to numbers – GAS readSheetData returns all cell
+  // values as strings (String(raw)), so these must be explicitly coerced after
+  // a sync-down to avoid string concatenation in arithmetic operations.
+  out.riel          = parseFloat(out.riel)          || 0;
+  out.creditAmount  = _depCreditAmt(out);
+  out.amount        = parseFloat(out.amount)        || 0;
   // Ensure cash is a number; infer from total when missing or empty string
   if (out.cash === undefined || out.cash === '' || out.cash === null) {
-    var creditAmt = out.creditAmount !== undefined ? (parseFloat(out.creditAmount) || 0) : (parseFloat(out.credit) || 0);
-    var rielAmt   = parseFloat(out.riel) || 0;
-    var totalAmt  = parseFloat(out.amount) || 0;
-    var rielInUsd = parseFloat(khrToUsd(rielAmt)) || 0;
-    out.cash = Math.max(0, totalAmt - creditAmt - rielInUsd);
+    var rielInUsd = parseFloat(khrToUsd(out.riel)) || 0;
+    out.cash = Math.max(0, out.amount - out.creditAmount - rielInUsd);
   } else {
     out.cash = parseFloat(out.cash) || 0;
   }
