@@ -16,6 +16,8 @@ let currentCoverageTab = 'smart-home';
 let currentPromoView = 'new'; // 'new' or 'expired'
 let currentReportView = 'table'; // 'table' or 'summary'
 let filteredSales = [];
+let saleUnitShowAll = false;
+let salePointShowAll = false;
 let itemGroupSelected = 'unit'; // 'unit' or 'dollar'
 let kpiValueMode = 'unit'; // 'unit' or 'currency'
 let kpiTypeSelected = 'Sales';
@@ -783,6 +785,12 @@ function toLocalDateStr(str) {
 function todayStr() {
   var d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// Returns the first day of the current month as a "YYYY-MM-DD" string.
+function currentMonthStart() {
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01';
 }
 
 // Auto-calculate expiry date for Top Up: start date + period * 30 days.
@@ -1815,6 +1823,10 @@ function applyReportFilters() {
     return true;
   });
 
+  // Reset show-all when filters change so user sees the latest 5 again
+  saleUnitShowAll = false;
+  salePointShowAll = false;
+
   renderSaleTable();
   updateSaleKpis();
   // If the summary/chart view is currently active, refresh it too so charts stay up to date
@@ -1828,10 +1840,16 @@ function applyReportFilters() {
 }
 
 function clearReportFilters() {
-  ['sale-date-from', 'sale-date-to', 'sale-date-search', 'sale-filter-agent', 'sale-filter-branch'].forEach(function(id) {
+  var mStart = currentMonthStart();
+  var mEnd = todayStr();
+  var fromEl = g('sale-date-from'); if (fromEl) fromEl.value = mStart;
+  var toEl = g('sale-date-to'); if (toEl) toEl.value = mEnd;
+  ['sale-date-search', 'sale-filter-agent', 'sale-filter-branch'].forEach(function(id) {
     const el = g(id); if (el) el.value = '';
   });
-  filteredSales = getSaleBaseRecords();
+  saleUnitShowAll = false;
+  salePointShowAll = false;
+  filteredSales = getSaleBaseRecords().filter(function(s) { return s.date >= mStart && s.date <= mEnd; });
   renderSaleTable();
   updateSaleKpis();
 }
@@ -1933,18 +1951,105 @@ function renderSaleTable() {
       branches.map(function(b) { return '<option value="' + esc(b) + '"' + (curBranch === b ? ' selected' : '') + '>' + esc(b) + '</option>'; }).join('');
   }
 
-  const data = filteredSales;
-  const unitData  = data.filter(function(s) { return s.transactionType !== 'point'; });
-  const pointData = data.filter(function(s) { return s.transactionType === 'point'; });
+  // Update period badges to show current filter range
+  var filterFrom = rv('sale-date-from');
+  var filterTo   = rv('sale-date-to');
+  var mStart = currentMonthStart();
+  var mToday = todayStr();
+  var isDefaultMonth = filterFrom === mStart && filterTo === mToday;
+  var periodLabel;
+  if (isDefaultMonth) {
+    periodLabel = 'This Month';
+  } else if (filterFrom && filterTo) {
+    periodLabel = filterFrom + ' → ' + filterTo;
+  } else if (filterFrom) {
+    periodLabel = 'From ' + filterFrom;
+  } else if (filterTo) {
+    periodLabel = 'Until ' + filterTo;
+  } else {
+    periodLabel = 'All Time';
+  }
+  var unitBadge = g('sale-unit-period-badge');   if (unitBadge)  unitBadge.textContent  = periodLabel;
+  var pointBadge = g('sale-point-period-badge'); if (pointBadge) pointBadge.textContent = periodLabel;
 
+  const data = filteredSales;
   const unitItems   = itemCatalogue.filter(function(x) { return x.group === 'unit'   && x.status === 'active'; });
   const dollarItems = itemCatalogue.filter(function(x) { return x.group === 'dollar' && x.status === 'active' && x.id !== ITEM_ID_REVENUE; });
 
-  let totalUnits = 0, totalDollar = 0, totalPoints = 0;
+  // Sort all data newest first
+  var sortNewest = function(a, b) {
+    var da = (a.submittedAt || a.date || '');
+    var db = (b.submittedAt || b.date || '');
+    return db.localeCompare(da);
+  };
+
+  const unitDataAll  = data.filter(function(s) { return s.transactionType !== 'point'; }).sort(sortNewest);
+  const pointDataAll = data.filter(function(s) { return s.transactionType === 'point'; }).sort(sortNewest);
+
+  // Pre-calculate totals from ALL filtered data (not just the displayed 5)
+  let totalUnits = 0, totalRevenue = 0, totalPoints = 0, totalDollar = 0;
+  unitDataAll.forEach(function(s) {
+    unitItems.forEach(function(item) {
+      if (s.items && s.items[item.id]) totalUnits += s.items[item.id];
+    });
+    if (s.dollarItems && s.dollarItems[ITEM_ID_REVENUE]) totalRevenue += s.dollarItems[ITEM_ID_REVENUE];
+    dollarItems.forEach(function(item) {
+      if (s.dollarItems && s.dollarItems[item.id]) totalDollar += s.dollarItems[item.id];
+    });
+  });
+  pointDataAll.forEach(function(s) { totalPoints += parseFloat(s.kpiPoints) || 0; });
+
+  // Update unit table header summary
+  var unitHeaderTotals = g('sale-unit-header-totals');
+  if (unitHeaderTotals) {
+    unitHeaderTotals.innerHTML = unitDataAll.length
+      ? '<span style="color:#2d6a4f;font-weight:600;">Units: ' + totalUnits + '</span>'
+        + '<span style="margin:0 6px;color:#ccc;">|</span>'
+        + '<span style="color:#555;">Rev: ' + fmtMoney(totalRevenue) + '</span>'
+        + (unitDataAll.length <= 5 ? '' : '<span style="margin:0 6px;color:#ccc;">|</span><span style="color:#888;">' + unitDataAll.length + ' records</span>')
+      : '<span style="color:#aaa;font-style:italic;">No data</span>';
+  }
+
+  // Update point table header summary
+  var pointHeaderTotals = g('sale-point-header-totals');
+  if (pointHeaderTotals) {
+    pointHeaderTotals.innerHTML = pointDataAll.length
+      ? '<span style="color:#FF9800;font-weight:600;">Points: ' + (totalPoints % 1 === 0 ? totalPoints : totalPoints.toFixed(2)) + '</span>'
+        + (pointDataAll.length <= 5 ? '' : '<span style="margin:0 6px;color:#ccc;">|</span><span style="color:#888;">' + pointDataAll.length + ' records</span>')
+      : '<span style="color:#aaa;font-style:italic;">No data</span>';
+  }
+
+  // Update toggle buttons
+  var unitToggle = g('sale-unit-view-toggle');
+  if (unitToggle) {
+    if (unitDataAll.length <= 5) {
+      unitToggle.style.display = 'none';
+    } else {
+      unitToggle.style.display = '';
+      unitToggle.innerHTML = saleUnitShowAll
+        ? '<i class="fas fa-compress-alt"></i> Last 5'
+        : '<i class="fas fa-list"></i> View All (' + unitDataAll.length + ')';
+    }
+  }
+  var pointToggle = g('sale-point-view-toggle');
+  if (pointToggle) {
+    if (pointDataAll.length <= 5) {
+      pointToggle.style.display = 'none';
+    } else {
+      pointToggle.style.display = '';
+      pointToggle.innerHTML = salePointShowAll
+        ? '<i class="fas fa-compress-alt"></i> Last 5'
+        : '<i class="fas fa-list"></i> View All (' + pointDataAll.length + ')';
+    }
+  }
+
+  // Limit rows for display
+  const unitData  = saleUnitShowAll  ? unitDataAll  : unitDataAll.slice(0, 5);
+  const pointData = salePointShowAll ? pointDataAll : pointDataAll.slice(0, 5);
 
   // ---- Unit-Based Performance Table ----
   if (unitTable) {
-    if (!unitData.length) {
+    if (!unitDataAll.length) {
       unitTable.innerHTML = '<thead></thead><tbody><tr><td colspan="20" style="text-align:center;padding:30px;color:#999;"><i class="fas fa-inbox" style="font-size:1.5rem;display:block;margin-bottom:8px;"></i>No unit-based records found</td></tr></tbody>';
     } else {
       let uHeader1 = '<tr><th rowspan="2">Agent</th><th rowspan="2">Branch</th><th rowspan="2">Submit Date</th>';
@@ -1964,13 +2069,11 @@ function renderSaleTable() {
 
         const unitCells = unitItems.map(function(item) {
           const qty = s.items && s.items[item.id] ? s.items[item.id] : 0;
-          totalUnits += qty;
           return '<td class="td-unit">' + (qty || '') + '</td>';
         }).join('');
 
         const dCells = dollarItems.map(function(item) {
           const amt = s.dollarItems && s.dollarItems[item.id] ? s.dollarItems[item.id] : 0;
-          totalDollar += amt;
           return '<td class="td-dollar">' + (amt > 0 ? fmtMoney(amt, esc(item.currency) + ' ') : '') + '</td>';
         }).join('');
 
@@ -2000,7 +2103,7 @@ function renderSaleTable() {
 
   // ---- Point-Based Performance Table ----
   if (pointTable) {
-    if (!pointData.length) {
+    if (!pointDataAll.length) {
       pointTable.innerHTML = '<thead></thead><tbody><tr><td colspan="9" style="text-align:center;padding:30px;color:#999;"><i class="fas fa-inbox" style="font-size:1.5rem;display:block;margin-bottom:8px;"></i>No point-based records found</td></tr></tbody>';
     } else {
       const pHeader = '<tr>' +
@@ -2015,7 +2118,6 @@ function renderSaleTable() {
         var svc     = KPI_SERVICES.find(function(x) { return x.id === s.kpiService; });
         var svcName = svc ? svc.name + ' (' + svc.category + ')' : (s.kpiService || '');
         var pts     = parseFloat(s.kpiPoints) || 0;
-        totalPoints += pts;
 
         return '<tr>' +
           '<td><div class="name-cell"><span class="avatar-circle av-' + avIdx + '" style="width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;color:#fff;margin-right:8px;">' + esc(ini(s.agent)) + '</span>' + esc(s.agent) + '</div></td>' +
@@ -5255,6 +5357,15 @@ function applySaleFilters() { applyReportFilters(); }
 function clearSaleFilters() { clearReportFilters(); }
 function loadDashboard() { renderDashboard(); }
 function selectKpiMode(mode) { setValueMode(mode); }
+
+function toggleUnitTableView() {
+  saleUnitShowAll = !saleUnitShowAll;
+  renderSaleTable();
+}
+function togglePointTableView() {
+  salePointShowAll = !salePointShowAll;
+  renderSaleTable();
+}
 function submitKPI(e) { submitKpi(e); }
 function switchSaleView(view) { setReportView(view); }
 function togglePasswordVisibility(inputId, eyeId) { togglePwd(inputId, eyeId); }
@@ -5982,7 +6093,11 @@ function emailApprovalForm() {
 document.addEventListener('DOMContentLoaded', function() {
   loadAllData();
   loadInvData();
-  filteredSales = saleRecords.slice();
+  var mStart = currentMonthStart();
+  var mEnd = todayStr();
+  var fromEl = g('sale-date-from'); if (fromEl) fromEl.value = mStart;
+  var toEl = g('sale-date-to'); if (toEl) toEl.value = mEnd;
+  filteredSales = saleRecords.filter(function(s) { return s.date >= mStart && s.date <= mEnd; });
   populateBranchSelects();
   renderItemChips();
   renderNewCustomerTable();
