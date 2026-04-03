@@ -119,7 +119,7 @@ const KPI_SERVICES = [
   { id: 'ks10', name: 'SME Existing Recharge',      category: 'FBB SME',      rate: 2.0, addOn: 0 },
   { id: 'ks11', name: 'ICT Solution',               category: 'MBB ICT',      rate: 2.0, addOn: 0 },
   { id: 'ks12', name: 'Device Handset/Accessory',   category: 'Other',        rate: 0.5, addOn: 0 },
-  { id: 'ks13', name: 'eSIM',                       category: 'Other',        rate: 1.0, addOn: 2.0 },
+  { id: 'ks13', name: 'eSIM',                       category: 'Other',        rate: 0.0, addOn: 2.0 },
   { id: 'ks14', name: 'Smart NAS Download',         category: 'Other',        rate: 0.0, addOn: 2.0 },
 ];
 
@@ -1452,6 +1452,11 @@ function switchSaleModalType(type) {
 
 function updateKpiPointPreview() {
   var serviceId = rv('sale-kpi-service');
+  // Auto-fill amount=1 for unit-counted services (eSIM, Smart NAS Download)
+  if (serviceId === 'ks13' || serviceId === 'ks14') {
+    var amtInp = g('sale-kpi-amount');
+    if (amtInp && amtInp.value === '') amtInp.value = '1';
+  }
   var amount = rv('sale-kpi-amount');
   var pts = calcKpiPoints(serviceId, amount);
   var el = g('kpi-points-value');
