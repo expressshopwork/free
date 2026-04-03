@@ -54,6 +54,12 @@ const KNOWN_CURS = ['USD','KHR','THB','VND'];
 const KNOWN_UNITS = ['Unit','SIM','GB','MB','Minutes','SMS','Voucher'];
 const GAS_URL_PREFIX = 'https://script.google.com/macros/s/';
 const SYNCED_SHEETS = ['Sales','Customers','TopUp','Terminations','OutCoverage','Promotions','Deposits','KPI','Items','Coverage','Staff'];
+// Target spreadsheet ID — included in every GAS request so all roles (admin,
+// supervisor, agent) always write to the same spreadsheet, regardless of which
+// GAS deployment URL a given browser has cached in localStorage.
+// Note: this identifier is safe to include in client-side code for a team-internal
+// tool — it merely names the destination; the GAS script enforces all write access.
+const SPREADSHEET_ID = '1K1cp9nhuHIu9iRGHCjk8hhjkL-CANfaC61qoEI-HT90';
 
 // Item ID constants for key KPI calculations
 const ITEM_ID_REVENUE = 'i8';
@@ -156,9 +162,13 @@ var gsUrl = (function() {
 function _gsPost(payload, retries) {
   if (!gsUrl) return Promise.resolve({});
   retries = retries === undefined ? 2 : retries;
+  // Always include the spreadsheet ID so every role writes to the same target sheet,
+  // regardless of which GAS deployment URL is stored in this browser's localStorage.
+  var body = Object.assign({}, payload);
+  body.spreadsheetId = SPREADSHEET_ID;
   return fetch(gsUrl, {
     method: 'POST',
-    body: JSON.stringify(payload)
+    body: JSON.stringify(body)
   })
   .then(function(resp) { return resp.json(); })
   .catch(function(err) {
@@ -304,9 +314,12 @@ function readSheet(sheetName) {
 
   console.log('[SYNC] Reading sheet:', sheetName);
 
+  var body = { sheet: sheetName, action: 'read' };
+  body.spreadsheetId = SPREADSHEET_ID;
+
   return fetch(gsUrl, {
     method: 'POST',
-    body: JSON.stringify({ sheet: sheetName, action: 'read' })
+    body: JSON.stringify(body)
   })
     .then(function(r) {
       if (!r.ok) {
@@ -1746,7 +1759,7 @@ function appendDailySale(record) {
 // Agents only see their own records; supervisors see all records in their branch/shop; admin/cluster see all.
 function getSaleBaseRecords() {
   if (currentRole === 'agent' && currentUser) {
-    return saleRecords.filter(function(s) { return s.branch === currentUser.branch; });
+    return saleRecords.filter(function(s) { return s.agent === currentUser.name; });
   }
   if (currentRole === 'supervisor' && currentUser) {
     return saleRecords.filter(function(s) { return s.branch === currentUser.branch; });
@@ -2427,7 +2440,7 @@ function renderDashboard() {
   // Role-based data filtering
   let viewSales = saleRecords;
   if (currentRole === 'agent' && currentUser) {
-    viewSales = saleRecords.filter(function(s) { return s.branch === currentUser.branch; });
+    viewSales = saleRecords.filter(function(s) { return s.agent === currentUser.name; });
   } else if (currentRole === 'supervisor' && currentUser) {
     viewSales = saleRecords.filter(function(s) { return s.branch === currentUser.branch; });
   }
@@ -6152,6 +6165,8 @@ document.addEventListener('DOMContentLoaded', function() {
       var avatarEl = g('topbar-avatar'); if (avatarEl) avatarEl.textContent = ini(savedSession.name);
       navigateTo('dashboard', null);
       startSessionTimer(SESSION_TIMEOUT_MS - sessionAge);
+      // Refresh all data from Google Sheets so every role sees up-to-date records after a page reload.
+      refreshAllData();
     }
   }
 
