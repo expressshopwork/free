@@ -324,14 +324,19 @@ function updateRow(ss, sheetName, data) {
   for (var i = 0; i < idValues.length; i++) {
     if (String(idValues[i][0]) === String(data.id)) {
       var rowNumber = i + 2; // +2: 1-based index + header row offset
-      // Update only the columns present in data (skip 'id')
+      // Read the full existing row so we can write all columns back in one batch call.
+      // This avoids multiple round-trips and prevents a partial-write state if the
+      // script times out mid-loop.
+      var fullRow = sheet.getRange(rowNumber, 1, 1, headers.length).getValues()[0];
+      // Overlay only the columns present in data (skip 'id')
       Object.keys(data).forEach(function(k) {
         if (k === 'id') return;
         var colIdx = headers.indexOf(k);
         if (colIdx >= 0) {
-          sheet.getRange(rowNumber, colIdx + 1).setValue(toSheetValue(data[k]));
+          fullRow[colIdx] = toSheetValue(data[k]);
         }
       });
+      sheet.getRange(rowNumber, 1, 1, headers.length).setValues([fullRow]);
       return jsonResponse({ status: 'ok' });
     }
   }
