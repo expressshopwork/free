@@ -5369,14 +5369,18 @@ function handleLogin(e) {
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-right-to-bracket"></i> Sign In'; }
     }
   }
-  console.log('[AUTH] Fetching staff data from Google Sheets...');
-  fetchStaffFromSheet()
+  console.log('[AUTH] Loading config then fetching staff data...');
+  loadConfigFromFirestore()
+    .then(function() {
+      console.log('[AUTH] Config loaded, fetching staff from Google Sheets...');
+      return fetchStaffFromSheet();
+    })
     .then(function() {
       console.log('[AUTH] Staff data fetch completed');
       doAuth();
     })
     .catch(function(err) {
-      console.error('[AUTH] Staff data fetch error:', err);
+      console.error('[AUTH] Auth setup error:', err);
       doAuth(); // Still attempt auth with cached data
     });
 }
