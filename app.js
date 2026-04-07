@@ -1131,6 +1131,11 @@ function saveGasUrl() {
   }
   gsUrl = val;
   try { localStorage.setItem(LS_KEYS.gasUrl, val); } catch(e) { console.warn('Could not save GAS URL:', e); }
+  // Persist to Firestore so all roles (agent, supervisor) on any device inherit this URL.
+  if (window.firebaseDb && window.fbDoc && window.fbSetDoc) {
+    window.fbSetDoc(window.fbDoc(window.firebaseDb, 'config', 'gasConfig'), { gasUrl: val }, { merge: true })
+      .catch(function(e) { console.warn('[CONFIG] Could not save GAS URL to Firestore:', e); });
+  }
   showToast('Google Sheets URL saved.', 'success');
   renderGoogleSheetsSettings();
 }
@@ -1138,8 +1143,43 @@ function saveGasUrl() {
 function resetGasUrl() {
   gsUrl = GS_URL_DEFAULT;
   try { localStorage.removeItem(LS_KEYS.gasUrl); } catch(e) {}
+  // Clear from Firestore as well.
+  if (window.firebaseDb && window.fbDoc && window.fbSetDoc) {
+    window.fbSetDoc(window.fbDoc(window.firebaseDb, 'config', 'gasConfig'), { gasUrl: '' }, { merge: true })
+      .catch(function(e) { console.warn('[CONFIG] Could not clear GAS URL from Firestore:', e); });
+  }
   showToast('Reset to default Google Sheets URL.', 'success');
   renderGoogleSheetsSettings();
+}
+
+/**
+ * Load the GAS URL (and optionally spreadsheet ID) from the shared Firestore
+ * config document so all roles (agent, supervisor) on any device can sync even
+ * when they have never visited the Google Sheets settings panel.
+ * Returns a Promise that resolves when the config has been loaded (or if
+ * Firestore is unavailable the Promise resolves immediately).
+ */
+function loadConfigFromFirestore() {
+  if (!window.firebaseDb || !window.fbDoc || !window.fbGetDoc) return Promise.resolve();
+  var docRef = window.fbDoc(window.firebaseDb, 'config', 'gasConfig');
+  return window.fbGetDoc(docRef).then(function(snap) {
+    if (!snap.exists()) return;
+    var data = snap.data();
+    // Only update gsUrl if it is not already set locally (localStorage wins).
+    if (data.gasUrl && !gsUrl) {
+      gsUrl = data.gasUrl;
+      try { localStorage.setItem(LS_KEYS.gasUrl, gsUrl); } catch(e) {}
+      console.log('[CONFIG] Loaded GAS URL from Firestore');
+    }
+    // Similarly load a shared spreadsheet ID if not already set locally.
+    if (data.spreadsheetId && runtimeSpreadsheetId === SPREADSHEET_ID) {
+      runtimeSpreadsheetId = data.spreadsheetId;
+      try { localStorage.setItem(LS_SPREADSHEET_ID_KEY, runtimeSpreadsheetId); } catch(e) {}
+      console.log('[CONFIG] Loaded Spreadsheet ID from Firestore');
+    }
+  }).catch(function(e) {
+    console.warn('[CONFIG] Could not load config from Firestore:', e);
+  });
 }
 
 /**
@@ -1174,6 +1214,11 @@ function saveSpreadsheetId() {
   }
   runtimeSpreadsheetId = id;
   try { localStorage.setItem(LS_SPREADSHEET_ID_KEY, id); } catch(e) { console.warn('Could not save Spreadsheet ID:', e); }
+  // Persist to Firestore so all roles inherit this spreadsheet ID.
+  if (window.firebaseDb && window.fbDoc && window.fbSetDoc) {
+    window.fbSetDoc(window.fbDoc(window.firebaseDb, 'config', 'gasConfig'), { spreadsheetId: id }, { merge: true })
+      .catch(function(e) { console.warn('[CONFIG] Could not save Spreadsheet ID to Firestore:', e); });
+  }
   showToast('Spreadsheet ID saved: ' + id, 'success');
   renderGoogleSheetsSettings();
 }
@@ -1181,6 +1226,11 @@ function saveSpreadsheetId() {
 function resetSpreadsheetId() {
   runtimeSpreadsheetId = SPREADSHEET_ID;
   try { localStorage.removeItem(LS_SPREADSHEET_ID_KEY); } catch(e) {}
+  // Clear from Firestore as well.
+  if (window.firebaseDb && window.fbDoc && window.fbSetDoc) {
+    window.fbSetDoc(window.fbDoc(window.firebaseDb, 'config', 'gasConfig'), { spreadsheetId: '' }, { merge: true })
+      .catch(function(e) { console.warn('[CONFIG] Could not clear Spreadsheet ID from Firestore:', e); });
+  }
   showToast('Reset to default Spreadsheet ID.', 'success');
   renderGoogleSheetsSettings();
 }
@@ -5306,8 +5356,9 @@ function handleLogin(e) {
       var nameEl = g('topbar-name'); if (nameEl) nameEl.textContent = user.name;
       var avatarEl = g('topbar-avatar'); if (avatarEl) avatarEl.textContent = ini(user.name);
       navigateTo('dashboard', null);
-      // Auto-refresh all data from Google Sheets on login so users always see the latest records
-      refreshAllData();
+      // Load shared GAS URL from Firestore (so agent/supervisor on any device can sync),
+      // then auto-refresh all data from Google Sheets.
+      loadConfigFromFirestore().then(function() { refreshAllData(); });
     } else {
       console.error('[AUTH] \u2717 Authentication failed');
       console.error('[AUTH] No matching user found for username:', username);
@@ -5627,7 +5678,9 @@ function loginFirebaseUser(fbUser, profile) {
   startSessionTimer();
   applyRolePermissions(currentRole);
   navigateTo('dashboard', document.getElementById('nav-dashboard'));
-  syncDownAll();
+  // Load shared GAS URL from Firestore (so agent/supervisor on any device can sync),
+  // then sync all data.
+  loadConfigFromFirestore().then(function() { syncDownAll(); });
 }
 
 function showPendingScreen() {
@@ -6382,8 +6435,9 @@ document.addEventListener('DOMContentLoaded', function() {
       var avatarEl = g('topbar-avatar'); if (avatarEl) avatarEl.textContent = ini(savedSession.name);
       navigateTo('dashboard', null);
       startSessionTimer(SESSION_TIMEOUT_MS - sessionAge);
-      // Refresh all data from Google Sheets so every role sees up-to-date records after a page reload.
-      refreshAllData();
+      // Load shared GAS URL from Firestore (so agent/supervisor on any device can sync),
+      // then refresh all data from Google Sheets so every role sees up-to-date records.
+      loadConfigFromFirestore().then(function() { refreshAllData(); });
     }
   }
 
