@@ -56,7 +56,7 @@ const GAS_URL_PREFIX = 'https://script.google.com/macros/s/';
 const SYNCED_SHEETS = ['DailySale','Customers','TopUp','Terminations','OutCoverage','Promotions','Deposits','KPI','Items','Coverage','Staff'];
 // Target spreadsheet ID — set this to your Google Spreadsheet ID to enable sync.
 // You can also set it at runtime via the Google Sheets settings panel.
-const SPREADSHEET_ID = '';
+const SPREADSHEET_ID = '1uW41n-7AajDU9pOynhSLCCFa4vG7JF1rnTjibI-pIBg';
 
 // Item ID constants for key KPI calculations
 const ITEM_ID_REVENUE = 'i8';
