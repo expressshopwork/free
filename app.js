@@ -1165,14 +1165,16 @@ function loadConfigFromFirestore() {
   return window.fbGetDoc(docRef).then(function(snap) {
     if (!snap.exists()) return;
     var data = snap.data();
-    // Only update gsUrl if it is not already set locally (localStorage wins).
-    if (data.gasUrl && !gsUrl) {
+    // Always apply the Firestore GAS URL so every role (including agent/supervisor)
+    // automatically picks up any URL change made by admin, even if a stale URL
+    // was previously cached in localStorage.
+    if (data.gasUrl) {
       gsUrl = data.gasUrl;
       try { localStorage.setItem(LS_KEYS.gasUrl, gsUrl); } catch(e) {}
       console.log('[CONFIG] Loaded GAS URL from Firestore');
     }
-    // Similarly load a shared spreadsheet ID if not already set locally.
-    if (data.spreadsheetId && runtimeSpreadsheetId === SPREADSHEET_ID) {
+    // Always apply the Firestore spreadsheet ID for the same reason.
+    if (data.spreadsheetId) {
       runtimeSpreadsheetId = data.spreadsheetId;
       try { localStorage.setItem(LS_SPREADSHEET_ID_KEY, runtimeSpreadsheetId); } catch(e) {}
       console.log('[CONFIG] Loaded Spreadsheet ID from Firestore');
