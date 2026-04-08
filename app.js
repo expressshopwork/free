@@ -415,13 +415,37 @@ function syncDownAll() {
   if (btn) btn.disabled = true;
 
   var sheets = [
-    { name: 'DailySale',    lsKey: LS_KEYS.sales,        assign: function(d) { saleRecords = d.map(normalizeSaleRecord); } },
-    { name: 'Customers',    lsKey: LS_KEYS.customers,    assign: function(d) { newCustomers = d; } },
-    { name: 'TopUp',        lsKey: LS_KEYS.topup,        assign: function(d) { topUpList = d; } },
-    { name: 'Terminations', lsKey: LS_KEYS.terminations, assign: function(d) { terminationList = d; } },
-    { name: 'OutCoverage',  lsKey: LS_KEYS.outCoverage,  assign: function(d) { outCoverageList = d; } },
+    { name: 'DailySale',    lsKey: LS_KEYS.sales,        assign: function(d) {
+      var sheetIds = {}; d.forEach(function(r) { if (r.id) sheetIds[r.id] = true; });
+      var localOnly = saleRecords.filter(function(r) { return r.id && !sheetIds[r.id]; });
+      saleRecords = d.concat(localOnly).map(normalizeSaleRecord);
+    } },
+    { name: 'Customers',    lsKey: LS_KEYS.customers,    assign: function(d) {
+      var sheetIds = {}; d.forEach(function(r) { if (r.id) sheetIds[r.id] = true; });
+      var localOnly = newCustomers.filter(function(r) { return r.id && !sheetIds[r.id]; });
+      newCustomers = d.concat(localOnly);
+    } },
+    { name: 'TopUp',        lsKey: LS_KEYS.topup,        assign: function(d) {
+      var sheetIds = {}; d.forEach(function(r) { if (r.id) sheetIds[r.id] = true; });
+      var localOnly = topUpList.filter(function(r) { return r.id && !sheetIds[r.id]; });
+      topUpList = d.concat(localOnly);
+    } },
+    { name: 'Terminations', lsKey: LS_KEYS.terminations, assign: function(d) {
+      var sheetIds = {}; d.forEach(function(r) { if (r.id) sheetIds[r.id] = true; });
+      var localOnly = terminationList.filter(function(r) { return r.id && !sheetIds[r.id]; });
+      terminationList = d.concat(localOnly);
+    } },
+    { name: 'OutCoverage',  lsKey: LS_KEYS.outCoverage,  assign: function(d) {
+      var sheetIds = {}; d.forEach(function(r) { if (r.id) sheetIds[r.id] = true; });
+      var localOnly = outCoverageList.filter(function(r) { return r.id && !sheetIds[r.id]; });
+      outCoverageList = d.concat(localOnly);
+    } },
     { name: 'Promotions',   lsKey: LS_KEYS.promotions,   assign: function(d) { promotionList = d; } },
-    { name: 'Deposits',     lsKey: LS_KEYS.deposits,     assign: function(d) { depositList = d.map(normalizeDeposit); } },
+    { name: 'Deposits',     lsKey: LS_KEYS.deposits,     assign: function(d) {
+      var sheetIds = {}; d.forEach(function(r) { if (r.id) sheetIds[r.id] = true; });
+      var localOnly = depositList.filter(function(r) { return r.id && !sheetIds[r.id]; });
+      depositList = d.concat(localOnly).map(normalizeDeposit);
+    } },
     { name: 'KPI',          lsKey: LS_KEYS.kpis,         assign: function(d) { kpiList = d; } },
     { name: 'Items',        lsKey: LS_KEYS.items,        assign: function(d) { if (d.length) itemCatalogue = d; } },
     { name: 'Coverage',     lsKey: LS_KEYS.coverage,     assign: function(d) { coverageLocations = d; } },
@@ -453,11 +477,12 @@ function syncDownAll() {
           return out;
         });
         s.assign(parsed);
-        lsSave(s.lsKey, parsed);
       });
   });
 
   return Promise.all(promises).then(function() {
+    // Save merged data (sheet + any locally-added records not yet in the sheet) to localStorage
+    saveAllData();
     // Re-sync currentUser from the refreshed staffList
     if (currentUser) {
       var freshUser = staffList.find(function(u) { return u.id === currentUser.id; });
