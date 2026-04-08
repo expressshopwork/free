@@ -402,6 +402,20 @@ function syncUpAll() {
 // Sync all sheets down from Google Sheets into local memory and localStorage,
 // then re-render the current page. Exposed globally so admin can call it from
 // the browser console or a "Sync Down" button.
+
+// Helper: merge incoming sheet records with locally-held records.
+// Records present in the sheet (matched by id) are taken from the sheet.
+// Local-only records (not yet confirmed in the sheet) are appended to preserve
+// data that was saved locally but whose sheet write hadn't propagated yet.
+// An optional normalizer is applied only to the incoming sheet data.
+function _mergeWithLocal(sheetData, localData, normalizer) {
+  var sheetIds = {};
+  sheetData.forEach(function(r) { if (r.id) sheetIds[r.id] = true; });
+  var localOnly = localData.filter(function(r) { return r.id && !sheetIds[r.id]; });
+  var normalized = normalizer ? sheetData.map(normalizer) : sheetData;
+  return normalized.concat(localOnly);
+}
+
 function syncDownAll() {
   if (!gsUrl) {
     showToast('No sync URL configured.', 'error');
@@ -415,13 +429,13 @@ function syncDownAll() {
   if (btn) btn.disabled = true;
 
   var sheets = [
-    { name: 'DailySale',    lsKey: LS_KEYS.sales,        assign: function(d) { saleRecords = d.map(normalizeSaleRecord); } },
-    { name: 'Customers',    lsKey: LS_KEYS.customers,    assign: function(d) { newCustomers = d; } },
-    { name: 'TopUp',        lsKey: LS_KEYS.topup,        assign: function(d) { topUpList = d; } },
-    { name: 'Terminations', lsKey: LS_KEYS.terminations, assign: function(d) { terminationList = d; } },
-    { name: 'OutCoverage',  lsKey: LS_KEYS.outCoverage,  assign: function(d) { outCoverageList = d; } },
-    { name: 'Promotions',   lsKey: LS_KEYS.promotions,   assign: function(d) { promotionList = d; } },
-    { name: 'Deposits',     lsKey: LS_KEYS.deposits,     assign: function(d) { depositList = d.map(normalizeDeposit); } },
+    { name: 'DailySale',    lsKey: LS_KEYS.sales,        assign: function(d) { saleRecords    = _mergeWithLocal(d, saleRecords,    normalizeSaleRecord); } },
+    { name: 'Customers',    lsKey: LS_KEYS.customers,    assign: function(d) { newCustomers   = _mergeWithLocal(d, newCustomers,   null); } },
+    { name: 'TopUp',        lsKey: LS_KEYS.topup,        assign: function(d) { topUpList      = _mergeWithLocal(d, topUpList,      null); } },
+    { name: 'Terminations', lsKey: LS_KEYS.terminations, assign: function(d) { terminationList = _mergeWithLocal(d, terminationList, null); } },
+    { name: 'OutCoverage',  lsKey: LS_KEYS.outCoverage,  assign: function(d) { outCoverageList = _mergeWithLocal(d, outCoverageList, null); } },
+    { name: 'Promotions',   lsKey: LS_KEYS.promotions,   assign: function(d) { promotionList  = d; } },
+    { name: 'Deposits',     lsKey: LS_KEYS.deposits,     assign: function(d) { depositList    = _mergeWithLocal(d, depositList,    normalizeDeposit); } },
     { name: 'KPI',          lsKey: LS_KEYS.kpis,         assign: function(d) { kpiList = d; } },
     { name: 'Items',        lsKey: LS_KEYS.items,        assign: function(d) { if (d.length) itemCatalogue = d; } },
     { name: 'Coverage',     lsKey: LS_KEYS.coverage,     assign: function(d) { coverageLocations = d; } },
@@ -453,11 +467,12 @@ function syncDownAll() {
           return out;
         });
         s.assign(parsed);
-        lsSave(s.lsKey, parsed);
       });
   });
 
   return Promise.all(promises).then(function() {
+    // Save merged data (sheet + any locally-added records not yet in the sheet) to localStorage
+    saveAllData();
     // Re-sync currentUser from the refreshed staffList
     if (currentUser) {
       var freshUser = staffList.find(function(u) { return u.id === currentUser.id; });
